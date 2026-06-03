@@ -42,6 +42,21 @@ Extract the data into a JSON object with the following fields. Do not translate 
   "has_payment_amount_label": true or false, indicating if the label 'ยอดที่ต้องชำระ' appears anywhere on the receipt
 }
 
+THAI MONTHS VISUAL GUIDE:
+- มี.ค. = March (มีนาคม) - look for 'ม' with a long vowel 'ี' on top
+- พ.ค. = May (พฤษภาคม) - look for 'พ' (no vowel mark on top of the first letter)
+- พ.ย. = November (พฤศจิกายน) - look for 'พ' and 'ย'
+- ม.ค. = January (มกราคม) - look for 'ม' (no vowel on top of the first letter)
+- เม.ย. = April (เมษายน) - look for 'เ' before 'ม'
+- มิ.ย. = June (มิถุนายน) - look for 'ม' with 'ิ' on top
+Please be extremely careful not to confuse 'พ.ค.' (May) with 'มี.ค.' (March). 'พ.ค.' has NO vowel mark on top of the first letter 'พ', whereas 'มี.ค.' has the vowel 'ี' on top of 'ม'.
+
+QUANTITY EXTRACTION RULES:
+- The details table contains multiple rows.
+- Look at the row labeled "จำนวนหุ้น" or "จำนวนหน่วย". In the same row, there is a numeric value (e.g. 1.2345678 or 15.0).
+- In the row labeled "มูลค่าหุ้น" or "ยอดที่ต้องชำระ", there is a monetary value (e.g. 27,364.49 บาท or 112.50 USD).
+- Do NOT mix up the "จำนวนหุ้น" (shares) value with the "มูลค่าหุ้น" or "ยอดที่ต้องชำระ" (total money value). The quantity of shares is usually a decimal number or a whole number of shares, and is DIFFERENT from the total money value in Baht or USD.
+
 OUTPUT: Raw JSON only. No markdown, no explanation. Start with '{', end with '}'.`;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -273,7 +288,6 @@ function validateSlipData(raw) {
   // Check currency in bold_amount and stock_value
   const boldStr = String(raw.bold_amount || "").toLowerCase();
   const valueStr = String(raw.stock_value || "").toLowerCase();
-  const allText = JSON.stringify(raw).toLowerCase();
   const hasTHBUnit = boldStr.includes("บาท") || boldStr.includes("thb") || boldStr.includes("฿") || allText.includes("บาท") || allText.includes("thb");
 
   if (price <= 0) return null;
@@ -281,15 +295,22 @@ function validateSlipData(raw) {
   // 4. Resolve Quantity (share_amount) with cross-validation
   let share_amount = 0;
 
-  // Detect and flag when AI hallucinates and puts THB total amount directly into qtyTable
+  // Detect and flag when AI hallucinates and puts total monetary amount directly into qtyTable
   let isQtyHallucinated = false;
-  if (qtyTable > 0 && price > 0) {
-    const product = qtyTable * price;
-    // If USD stock but the total value exceeds $10,000 USD and we have a THB slip, it is likely hallucinated
-    if (product > 10000 && hasTHBUnit) {
+  if (qtyTable > 0 && price > 1.5) {
+    const ratioWithBold = boldNum > 0 ? qtyTable / boldNum : 0;
+    const ratioWithValue = stockValue > 0 ? qtyTable / stockValue : 0;
+
+    if ((ratioWithBold > 0.95 && ratioWithBold < 1.05) || (ratioWithValue > 0.95 && ratioWithValue < 1.05)) {
       isQtyHallucinated = true;
-    } else if (boldNum > 0 && Math.abs(qtyTable - boldNum) < 0.1 && hasTHBUnit) {
-      isQtyHallucinated = true;
+    } else {
+      const product = qtyTable * price;
+      // If USD stock but the total value exceeds $10,000 USD and we have a THB slip, it is likely hallucinated
+      if (product > 10000 && hasTHBUnit) {
+        isQtyHallucinated = true;
+      } else if (boldNum > 0 && Math.abs(qtyTable - boldNum) < 0.1 && hasTHBUnit) {
+        isQtyHallucinated = true;
+      }
     }
   }
 
@@ -325,10 +346,20 @@ function validateSlipData(raw) {
 
   // Cross-validation fallback if share_amount is 0 or was marked hallucinated (holding raw THB amount)
   if ((share_amount <= 0 || isQtyHallucinated) && price > 0) {
-    const totalThb = boldNum > 0 ? boldNum : qtyTable;
-    if (totalThb > 0) {
-      const rate = exchangeRate > 0 ? exchangeRate : 35.0;
-      const totalUsd = totalThb / rate;
+    const rawTotal = boldNum > 0 ? boldNum : qtyTable;
+    if (rawTotal > 0) {
+      const hasUSDUnit = boldStr.includes("usd") || boldStr.includes("$") || valueStr.includes("usd") || valueStr.includes("$") || allText.includes("usd") || allText.includes("$");
+      
+      let totalUsd = 0;
+      if (hasUSDUnit) {
+        totalUsd = rawTotal;
+      } else if (hasTHBUnit || rawTotal > 2000) {
+        const rate = exchangeRate > 0 ? exchangeRate : 35.0;
+        totalUsd = rawTotal / rate;
+      } else {
+        totalUsd = rawTotal;
+      }
+      
       share_amount = totalUsd / price;
     }
   }
