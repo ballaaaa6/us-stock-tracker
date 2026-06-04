@@ -220,6 +220,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
   const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
   const [avatarHovered, setAvatarHovered]         = useState(false);
   const [presetModalOpen, setPresetModalOpen]     = useState(false);
+  const [donutDrillCategory, setDonutDrillCategory] = useState(null);
   const [nickname, setNickname]                 = useState(() => localStorage.getItem(`profile_nickname_${user.username}`) || "");
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem("gemini_api_key") || "");
 
@@ -1498,15 +1499,40 @@ export default function Dashboard({ user, onLogout, showToast }) {
               />
 
               <div className="card stagger-3">
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, minHeight: 28 }}>
                   <div className="card-section-title">
                     <PieChart size={16} /> สัดส่วนสินทรัพย์
                   </div>
+                  {donutDrillCategory && (
+                    <button
+                      onClick={() => setDonutDrillCategory(null)}
+                      style={{
+                        background: "var(--primary-light)",
+                        color: "var(--primary)",
+                        border: "none",
+                        borderRadius: 10,
+                        padding: "4px 10px",
+                        fontSize: 11,
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        transition: "var(--transition)",
+                        boxShadow: "var(--shadow-xs)"
+                      }}
+                      className="ripple-btn"
+                    >
+                      ← ย้อนกลับ
+                    </button>
+                  )}
                 </div>
                 <DonutChart
                   segments={hasPrices && donutSegments.length > 0 ? donutSegments : []}
                   activeAssets={sortedAssets}
                   hasAssets={sortedAssets.length > 0}
+                  drillCategory={donutDrillCategory}
+                  setDrillCategory={setDonutDrillCategory}
                 />
               </div>
             </div>

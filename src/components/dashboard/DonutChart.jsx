@@ -3,10 +3,14 @@ import React, { useState, useEffect, useMemo } from "react";
 const DONUT_COLORS = ["#5236FF", "#00B98A", "#F59E0B", "#FF4B55", "#8B5CF6", "#06B6D4", "#EC4899", "#84CC16"];
 const CATEGORY_LABELS = { stock: "หุ้น", crypto: "คริปโต", gold: "ทองคำ/น้ำมัน", fiat: "เงินสด" };
 
-export default function DonutChart({ segments, activeAssets, hasAssets }) {
-  const [drillCategory, setDrillCategory] = useState(null);
+export default function DonutChart({ segments, activeAssets, hasAssets, drillCategory, setDrillCategory }) {
   const [hoveredSlice, setHoveredSlice] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // Clear hovered slice state when drillCategory changes
+  useEffect(() => {
+    setHoveredSlice(null);
+  }, [drillCategory]);
 
   const R = 68, CX = 80, CY = 80, SW = 18;
   const circumference = 2 * Math.PI * R;
@@ -121,35 +125,6 @@ export default function DonutChart({ segments, activeAssets, hasAssets }) {
 
   return (
     <div className="donut-card-body" style={{ position: "relative" }}>
-      {/* Back button for drilldown */}
-      {drillCategory && (
-        <button
-          onClick={() => {
-            setDrillCategory(null);
-            setHoveredSlice(null);
-          }}
-          style={{
-            background: "var(--primary-light)",
-            color: "var(--primary)",
-            border: "none",
-            borderRadius: 10,
-            padding: "6px 14px",
-            fontSize: 12,
-            fontWeight: 800,
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            marginBottom: 14,
-            transition: "var(--transition)",
-            boxShadow: "var(--shadow-xs)"
-          }}
-          className="ripple-btn"
-        >
-          ← ย้อนกลับ
-        </button>
-      )}
-
       <div className="chart-container">
         <div
           className="donut-wrapper"
