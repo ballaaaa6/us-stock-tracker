@@ -197,7 +197,7 @@ export default function DonutChart({ segments, activeAssets, hasAssets, drillCat
               )}
               <div style={{ display: "flex", gap: 12, justifyContent: "space-between", fontSize: 11, marginTop: 4 }}>
                 <span style={{ color: "var(--text-faint)" }}>สัดส่วน:</span>
-                <span style={{ color: hoveredSlice.color, fontWeight: 800 }}>{hoveredSlice.pct.toFixed(1)}%</span>
+                <span style={{ color: hoveredSlice.color, fontWeight: 800 }}>{hoveredSlice.pct.toFixed(2)}%</span>
               </div>
               {hoveredSlice.value !== undefined && (
                 <div style={{ display: "flex", gap: 12, justifyContent: "space-between", fontSize: 11 }}>
@@ -232,7 +232,7 @@ export default function DonutChart({ segments, activeAssets, hasAssets, drillCat
             >
               <div className="legend-color" style={{ background: s.color }} />
               <span className="legend-name" style={{ fontWeight: hoveredSlice && hoveredSlice.id === s.id ? 800 : 600 }}>{s.label}</span>
-              <span className="legend-pct" style={{ color: s.color, fontWeight: 800 }}>{s.pct.toFixed(1)}%</span>
+              <span className="legend-pct" style={{ color: s.color, fontWeight: 800 }}>{s.pct.toFixed(2)}%</span>
             </div>
           ))}
         </div>

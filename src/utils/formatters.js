@@ -14,7 +14,7 @@ export const fmtUSD = (n, hideValues = false) => {
   }).format(n);
 };
 
-export const fmtTHB = (n, decimals = 0, hideValues = false) => {
+export const fmtTHB = (n, decimals = 2, hideValues = false) => {
   if (hideValues) return "****";
   if (n == null) return "—";
   return "฿" + new Intl.NumberFormat("th-TH", {

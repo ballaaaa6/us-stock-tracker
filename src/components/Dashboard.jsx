@@ -86,7 +86,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
 
   const fmt = useMemo(() => ({
     usd:  (n) => fmtUSD(n, hideValues),
-    thb:  (n, decimals = 0) => fmtTHB(n, decimals, hideValues),
+    thb:  (n, decimals = 2) => fmtTHB(n, decimals, hideValues),
     pct:  fmtPct,
     qty:  (n) => fmtQty(n, hideValues),
     date: fmtDate,

@@ -32,7 +32,7 @@ export default function PnLDetailsModal({
 
   const fmt = useMemo(() => ({
     usd: (n) => fmtUSD(n, false), // Always show value inside PnLDetailsModal
-    thb: (n, decimals = 0) => fmtTHB(n, decimals, false),
+    thb: (n, decimals = 2) => fmtTHB(n, decimals, false),
     pct: fmtPct,
     qty: (n) => fmtQty(n, false)
   }), []);

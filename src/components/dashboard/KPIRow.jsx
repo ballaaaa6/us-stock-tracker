@@ -16,7 +16,7 @@ export default function KPIRow({
 }) {
   const fmt = useMemo(() => ({
     usd: (n) => fmtUSD(n, hideValues),
-    thb: (n, decimals = 0) => fmtTHB(n, decimals, hideValues),
+    thb: (n, decimals = 2) => fmtTHB(n, decimals, hideValues),
     pct: fmtPct,
   }), [hideValues]);
 
