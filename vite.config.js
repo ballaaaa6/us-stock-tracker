@@ -12,5 +12,8 @@ export default defineConfig({
         secure: false
       }
     }
+  },
+  test: {
+    exclude: ['**/node_modules/**', '**/dist/**', '**/scratch/**']
   }
 })

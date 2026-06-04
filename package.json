@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "local-api": "wrangler pages dev dist --kv=PORTFOLIOS --live-reload --compatibility-date 2025-07-18",
-    "serve": "npm run build; npx wrangler pages dev dist --port 8788 --compatibility-date 2025-07-18"
+    "serve": "npm run build; npx wrangler pages dev dist --port 8788 --compatibility-date 2025-07-18",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "lucide-react": "^0.344.0",
@@ -20,6 +22,7 @@
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.2.1",
     "vite": "^5.1.6",
+    "vitest": "^4.1.8",
     "wrangler": "^3.32.0"
   }
 }
