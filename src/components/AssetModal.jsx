@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { X, Search, Save, Plus, Trash2, ChevronDown, ChevronUp, History } from "lucide-react";
 import { buildDimeReceiptPrompt, getDimeReceiptSchema, validateParsedReceipt } from "../utils/ocrParser.js";
+import { api } from "../services/api";
 
 const getDisplaySymbol = (symbol) => {
   if (!symbol) return "";
@@ -307,24 +308,10 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
       }));
 
       try {
-        const res = await fetch("/api/scan", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            images: [{ base64: img.base64, mime: img.mime }],
-            skipSave: true
-          })
+        const data = await api.ocr.scan(token, {
+          images: [{ base64: img.base64, mime: img.mime }],
+          skipSave: true
         });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `Server status ${res.status}`);
-        }
-
-        const data = await res.json();
         if (data.errors && data.errors.length > 0) {
           throw new Error(data.errors[0].error);
         }
@@ -353,9 +340,8 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
             // Auto-map symbol from Yahoo Finance to get full suffix (e.g. PTT -> PTT.BK)
             if (validated.category === "stock" || validated.category === "gold") {
               try {
-                const checkRes = await fetch(`/api/prices?q=${encodeURIComponent(validated.symbol)}`);
-                if (checkRes.ok) {
-                  const suggestions = await checkRes.json();
+                const suggestions = await api.prices.checkPrice(validated.symbol);
+                if (suggestions) {
                   if (suggestions && suggestions.length > 0) {
                     const matched = suggestions.find(s => 
                       s.symbol.toUpperCase() === validated.symbol.toUpperCase() ||
@@ -539,8 +525,7 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
 
     setCurrencyRateLoading(true);
     const ticker = getCurrencyTicker(symbol);
-    fetch(`/api/prices?symbols=${encodeURIComponent(ticker)}`)
-      .then(res => res.json())
+    api.prices.getForSymbols(ticker)
       .then(data => {
         const q = data.quotes?.[ticker];
         if (q && q.price > 0) {
@@ -569,9 +554,8 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
     setSearching(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/prices?q=${encodeURIComponent(query)}`);
-        if (res.ok) {
-          const data = await res.json();
+        const data = await api.prices.checkPrice(query);
+        if (data) {
           setSuggestions(data.slice(0, 7));
           setShowDrop(data.length > 0);
         }

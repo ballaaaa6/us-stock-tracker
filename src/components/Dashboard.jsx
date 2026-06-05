@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { api } from "../services/api";
 import { Plus, RefreshCw, LogOut, Trash2, Download, Upload, PieChart, Pencil, X, Settings, Eye, EyeOff, Sparkles } from "lucide-react";
 import AssetModal from "./AssetModal";
 import AssetDetailPanel from "./AssetDetailPanel";
@@ -158,17 +159,10 @@ export default function Dashboard({ user, onLogout, showToast }) {
   const syncProfileToServer = async (name, pic, nick) => {
     if (user.username === "local_user") return;
     try {
-      await fetch("/api/profile", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${user.token}`
-        },
-        body: JSON.stringify({
-          portfolioName: name,
-          profilePic: pic,
-          nickname: nick
-        })
+      await api.profile.update(user.token, {
+        portfolioName: name,
+        profilePic: pic,
+        nickname: nick
       });
     } catch (err) {
       console.error("Profile sync failed:", err);
@@ -178,28 +172,21 @@ export default function Dashboard({ user, onLogout, showToast }) {
   useEffect(() => {
     const fetchProfileSync = async () => {
       try {
-        const res = await fetch("/api/profile", {
-          headers: {
-            "Authorization": `Bearer ${user.token}`
-          }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.portfolioName) {
-            setPortfolioName(data.portfolioName);
-            localStorage.setItem(`portfolio_name_${user.username}`, data.portfolioName);
-          }
-          if (data.profilePic) {
-            setProfilePic(data.profilePic);
-            localStorage.setItem(`profile_pic_${user.username}`, data.profilePic);
-          }
-          if (data.nickname) {
-            setNickname(data.nickname);
-            localStorage.setItem(`profile_nickname_${user.username}`, data.nickname);
-          }
+        const data = await api.profile.get(user.token);
+        if (data.portfolioName) {
+          setPortfolioName(data.portfolioName);
+          localStorage.setItem(`portfolio_name_${user.username}`, data.portfolioName);
+        }
+        if (data.profilePic) {
+          setProfilePic(data.profilePic);
+          localStorage.setItem(`profile_pic_${user.username}`, data.profilePic);
+        }
+        if (data.nickname) {
+          setNickname(data.nickname);
+          localStorage.setItem(`profile_nickname_${user.username}`, data.nickname);
         }
       } catch (err) {
-        console.error("Failed to fetch synced profile:", err);
+        console.warn("โหลดโปรไฟล์จากเซิร์ฟเวอร์ไม่สำเร็จ ใช้ข้อมูล Local แทน:", err.message);
       }
     };
     fetchProfileSync();
@@ -303,21 +290,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
     }
 
     try {
-      const res = await fetch("/api/auth/change-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: user.username,
-          oldPassword,
-          newPassword
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.error || "เปลี่ยนรหัสผ่านไม่สำเร็จ", "error");
-        return;
-      }
+      await api.auth.changePassword(user.username, oldPassword, newPassword);
       showToast("เปลี่ยนรหัสผ่านสำเร็จแล้ว!", "success");
       setOldPassword("");
       setNewPassword("");
@@ -392,14 +365,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
     localStorage.setItem(`local_portfolio_${user.username}`, JSON.stringify(updatedAssets));
 
     try {
-      const res = await fetch("/api/portfolio", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${user.token}` },
-        body: JSON.stringify(updatedAssets),
-      });
-      if (!res.ok) {
-        throw new Error("HTTP error " + res.status);
-      }
+      await api.portfolio.update(user.token, updatedAssets);
     } catch (err) {
       console.warn("ไม่สามารถเซฟข้อมูลลง Cloudflare ได้ ใช้ Local Storage แทน:", err.message);
       showToast("บันทึกข้อมูลในอุปกรณ์เครื่องนี้แล้ว (เซิร์ฟเวอร์ออฟไลน์)", "warning");
@@ -409,18 +375,11 @@ export default function Dashboard({ user, onLogout, showToast }) {
   /* ── FETCH PORTFOLIO ── */
   const fetchPortfolio = async () => {
     try {
-      const res = await fetch("/api/portfolio", {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAssets(data);
-        localStorage.setItem(`local_portfolio_${user.username}`, JSON.stringify(data));
-        await fetchPrices(data);
-        if (data.length > 0) fetchSparklines(data, chartRange);
-      } else {
-        throw new Error("HTTP error " + res.status);
-      }
+      const data = await api.portfolio.get(user.token);
+      setAssets(data);
+      localStorage.setItem(`local_portfolio_${user.username}`, JSON.stringify(data));
+      await fetchPrices(data);
+      if (data.length > 0) fetchSparklines(data, chartRange);
     } catch (err) {
       console.warn("โหลดพอร์ตจากเซิร์ฟเวอร์ไม่สำเร็จ ใช้ข้อมูล Local แทน:", err.message);
       const localData = JSON.parse(localStorage.getItem(`local_portfolio_${user.username}`) || "[]");
@@ -455,15 +414,14 @@ export default function Dashboard({ user, onLogout, showToast }) {
         return;
       }
 
-      let res = null;
+      let data = null;
       try {
-        res = await fetch(`/api/prices?symbols=${encodeURIComponent(symbols)}`);
+        data = await api.prices.getForSymbols(symbols);
       } catch (apiErr) {
         console.warn("fetchPrices API network error, falling back to mock:", apiErr.message);
       }
 
-      if (res && res.ok) {
-        const data = await res.json();
+      if (data) {
         const newPrices = data.quotes || {};
 
         // Detect price changes for flash animation
@@ -601,15 +559,14 @@ export default function Dashboard({ user, onLogout, showToast }) {
         }
       }
 
-      let res = null;
+      let data = null;
       try {
-        res = await fetch(`/api/prices?sparkline=${encodeURIComponent(syms.join(","))}&tf=${optimalRange}`);
+        data = await api.prices.getSparkline(syms.join(","), optimalRange);
       } catch (apiErr) {
         console.warn("fetchSparklines API network error, falling back to mock:", apiErr.message);
       }
 
-      if (res && res.ok) {
-        const data = await res.json();
+      if (data) {
         setSparklines(data);
       } else {
         const mockSparklines = {};
@@ -923,15 +880,14 @@ export default function Dashboard({ user, onLogout, showToast }) {
 
   useEffect(() => {
     const fetchHistoricalRates = async () => {
-      let res = null;
+      let data = null;
       try {
-        res = await fetch("/api/prices?history=THB=X&tf=MAX");
+        data = await api.prices.getHistory("THB=X", "MAX");
       } catch (apiErr) {
         console.warn("fetchHistoricalRates API network error, falling back to mock:", apiErr.message);
       }
 
-      if (res && res.ok) {
-        const data = await res.json();
+      if (data) {
         const rates = {};
         if (data.candles) {
           data.candles.forEach(c => {

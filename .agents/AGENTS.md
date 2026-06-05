@@ -21,6 +21,9 @@ Welcome to the US Stock Tracker project! This repository contains an `.agents/` 
 7. **Strict Testing (Vitest)**: All utility calculation files (`src/utils/formatters.js`, `src/utils/assetHelpers.js`), parsing logic (`src/utils/ocrParser.js`), and serverless API endpoints (`functions/api/`) must be covered by tests.
    - When modifying or adding helper logic, parsing patterns, or API request handlers, you MUST write or update the corresponding `*.test.js` files.
    - You MUST execute `npm run test` locally and verify that 100% of test suites pass successfully before compiling or pushing any changes to the remote repository.
+8. **Centralized API Client**: All frontend network requests to backend serverless endpoints `/api/*` MUST use the centralized client in [api.js](file:///d:/antigravity/us%20stock%20tracker/src/services/api.js).
+   - DO NOT write inline `fetch` requests inside React UI components.
+   - If a new backend endpoint is created, define a corresponding request method in [api.js](file:///d:/antigravity/us%20stock%20tracker/src/services/api.js) and update its unit tests in [api.test.js](file:///d:/antigravity/us%20stock%20tracker/src/services/api.test.js) before calling it in components.
 
 ## Active Session Flow
 - Check `.agents/active.md` to see the current active task and branch.

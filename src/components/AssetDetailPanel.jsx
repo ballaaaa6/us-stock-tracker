@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { X, TrendingUp, TrendingDown, RefreshCw, ShoppingCart, Calendar, History, ChevronDown, ChevronUp } from "lucide-react";
+import { api } from "../services/api";
 import { 
   fmtUSD as rawFmtUSD, 
   fmtTHB as rawFmtTHB, 
@@ -166,11 +167,9 @@ export default function AssetDetailPanel({ asset, price, exchangeRate, historica
       }
     }
 
-    fetch(`/api/prices?history=${encodeURIComponent(targetSymbol)}&tf=${fetchTf}`)
-      .then(r => r.json())
+    api.prices.getHistory(targetSymbol, fetchTf)
       .then(data => {
         if (cancelled) return;
-        if (data.error) { setError(data.error); setLoading(false); return; }
         setChartData(data);
         setLoading(false);
       })

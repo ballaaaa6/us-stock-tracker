@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { api } from "../services/api";
 import { LogIn, User, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function Login({ onLoginSuccess, onNavigateToRegister, showToast }) {
@@ -21,17 +22,7 @@ export default function Login({ onLoginSuccess, onNavigateToRegister, showToast 
 
       (async () => {
         try {
-          const response = await fetch("/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: autoUsername, password: autoPassword }),
-          });
-
-          const data = await response.json();
-
-          if (!response.ok) {
-            throw new Error(data.error || "ล็อกอินไม่สำเร็จ");
-          }
+          const data = await api.auth.login(autoUsername, autoPassword);
 
           localStorage.setItem("portfolio_user", JSON.stringify(data));
           showToast("ยินดีต้อนรับกลับเข้าสู่ระบบ!", "success");
@@ -53,17 +44,7 @@ export default function Login({ onLoginSuccess, onNavigateToRegister, showToast 
 
     setLoading(true);
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "ล็อกอินไม่สำเร็จ");
-      }
+      const data = await api.auth.login(username, password);
 
       // Save user session in localStorage to enable Auto-Login
       localStorage.setItem("portfolio_user", JSON.stringify(data));

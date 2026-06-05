@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { api } from "../services/api";
 import { UserPlus, User, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 export default function Register({ onNavigateToLogin, showToast }) {
@@ -34,17 +35,7 @@ export default function Register({ onNavigateToLogin, showToast }) {
 
     setLoading(true);
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: cleanUser, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "สมัครสมาชิกไม่สำเร็จ");
-      }
+      const data = await api.auth.register(cleanUser, password);
 
       showToast(data.message || "สมัครสมาชิกเสร็จสมบูรณ์!", "success");
       onNavigateToLogin(); // Go back to login
