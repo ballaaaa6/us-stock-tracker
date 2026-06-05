@@ -10,12 +10,36 @@ export default function AssetLogo({ symbol, category, style }) {
     const cat = category || "stock";
 
     if (cat === "fiat") {
-      const code = ({
-        THB:"th",USD:"us",EUR:"eu",JPY:"jp",GBP:"gb",AUD:"au",CAD:"ca",
-        SGD:"sg",CHF:"ch",CNY:"cn",HKD:"hk",KRW:"kr",INR:"in",NZD:"nz",
-        SEK:"se",NOK:"no",DKK:"dk",MYR:"my",IDR:"id",PHP:"ph",VND:"vn",
-        TWD:"tw",BRL:"br",RUB:"ru",ZAR:"za",TRY:"tr",MXN:"mx"
-      })[sym] || sym.slice(0,2).toLowerCase();
+      const code =
+        {
+          THB: "th",
+          USD: "us",
+          EUR: "eu",
+          JPY: "jp",
+          GBP: "gb",
+          AUD: "au",
+          CAD: "ca",
+          SGD: "sg",
+          CHF: "ch",
+          CNY: "cn",
+          HKD: "hk",
+          KRW: "kr",
+          INR: "in",
+          NZD: "nz",
+          SEK: "se",
+          NOK: "no",
+          DKK: "dk",
+          MYR: "my",
+          IDR: "id",
+          PHP: "ph",
+          VND: "vn",
+          TWD: "tw",
+          BRL: "br",
+          RUB: "ru",
+          ZAR: "za",
+          TRY: "tr",
+          MXN: "mx"
+        }[sym] || sym.slice(0, 2).toLowerCase();
       return [`https://flagcdn.com/w80/${code}.png`];
     }
 
@@ -27,7 +51,14 @@ export default function AssetLogo({ symbol, category, style }) {
       ];
     }
 
-    if (cat === "gold" || sym === "XAU" || sym === "GLD" || sym === "IAU" || sym === "CL" || (symbol && symbol.toUpperCase() === "CL=F")) {
+    if (
+      cat === "gold" ||
+      sym === "XAU" ||
+      sym === "GLD" ||
+      sym === "IAU" ||
+      sym === "CL" ||
+      (symbol && symbol.toUpperCase() === "CL=F")
+    ) {
       if (sym === "CL" || (symbol && symbol.toUpperCase() === "CL=F")) {
         return [`https://images.financialmodelingprep.com/symbol/USO.png`];
       }
@@ -44,7 +75,9 @@ export default function AssetLogo({ symbol, category, style }) {
   }, [sym, category]);
 
   // Reset when symbol changes
-  useEffect(() => { setSrcIndex(0); }, [sym, category]);
+  useEffect(() => {
+    setSrcIndex(0);
+  }, [sym, category]);
 
   if (!sources.length || srcIndex >= sources.length) {
     // Final fallback: colourful text initials
@@ -59,12 +92,17 @@ export default function AssetLogo({ symbol, category, style }) {
     <img
       src={sources[srcIndex]}
       alt={sym}
-      onError={() => setSrcIndex(i => i + 1)}
+      onError={() => setSrcIndex((i) => i + 1)}
       style={{
-        width: 38, height: 38, borderRadius: 12,
-        objectFit: "contain", background: "#FFFFFF",
-        padding: 4, border: "1px solid var(--border)",
-        boxShadow: "var(--shadow-xs)", flexShrink: 0,
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        objectFit: "contain",
+        background: "#FFFFFF",
+        padding: 4,
+        border: "1px solid var(--border)",
+        boxShadow: "var(--shadow-xs)",
+        flexShrink: 0,
         ...style
       }}
     />

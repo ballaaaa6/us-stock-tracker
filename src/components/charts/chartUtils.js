@@ -52,7 +52,7 @@ export function smoothPoints(points, toY) {
 
 export function getPoints(values, W, H, padX = 0, padY = 10) {
   if (!values || values.length < 2) return [];
-  const clean = values.filter(v => v != null && isFinite(v));
+  const clean = values.filter((v) => v != null && isFinite(v));
   if (clean.length < 2) return [];
   const min = Math.min(...clean);
   const max = Math.max(...clean);
@@ -61,13 +61,13 @@ export function getPoints(values, W, H, padX = 0, padY = 10) {
   const iH = H - padY * 2;
   return values.map((v, i) => ({
     x: padX + (i / (values.length - 1)) * iW,
-    y: padY + ((max - (v ?? min)) / range) * iH,
+    y: padY + ((max - (v ?? min)) / range) * iH
   }));
 }
 
 export const interpolateData = (data, visibleDurationMs) => {
   if (!data || data.length < 2) return data;
-  
+
   let intervalMs = 0;
   const oneMin = 60 * 1000;
   const oneHour = 60 * oneMin;
@@ -90,31 +90,31 @@ export const interpolateData = (data, visibleDurationMs) => {
   }
 
   const interpolated = [];
-  
+
   for (let i = 0; i < data.length - 1; i++) {
     const p1 = data[i];
     const p2 = data[i + 1];
-    
+
     const t1 = new Date(p1.date).getTime();
     const t2 = new Date(p2.date).getTime();
     const diff = t2 - t1;
-    
+
     interpolated.push(p1);
-    
+
     if (diff > intervalMs) {
       const steps = Math.floor(diff / intervalMs);
       for (let s = 1; s < steps; s++) {
         const t = t1 + s * intervalMs;
         const ratio = (t - t1) / diff;
-        
+
         // Linear interpolation for value and EMA lines
         const val = p1.value + (p2.value - p1.value) * ratio;
-        const ema10 = (p1.ema10 != null && p2.ema10 != null) ? p1.ema10 + (p2.ema10 - p1.ema10) * ratio : null;
-        const ema20 = (p1.ema20 != null && p2.ema20 != null) ? p1.ema20 + (p2.ema20 - p1.ema20) * ratio : null;
-        const ema50 = (p1.ema50 != null && p2.ema50 != null) ? p1.ema50 + (p2.ema50 - p1.ema50) * ratio : null;
-        const ema200 = (p1.ema200 != null && p2.ema200 != null) ? p1.ema200 + (p2.ema200 - p1.ema200) * ratio : null;
+        const ema10 = p1.ema10 != null && p2.ema10 != null ? p1.ema10 + (p2.ema10 - p1.ema10) * ratio : null;
+        const ema20 = p1.ema20 != null && p2.ema20 != null ? p1.ema20 + (p2.ema20 - p1.ema20) * ratio : null;
+        const ema50 = p1.ema50 != null && p2.ema50 != null ? p1.ema50 + (p2.ema50 - p1.ema50) * ratio : null;
+        const ema200 = p1.ema200 != null && p2.ema200 != null ? p1.ema200 + (p2.ema200 - p1.ema200) * ratio : null;
         const cost = p1.cost != null ? p1.cost : null;
-        
+
         interpolated.push({
           date: new Date(t).toISOString(),
           value: val,
@@ -123,12 +123,12 @@ export const interpolateData = (data, visibleDurationMs) => {
           ema50,
           ema200,
           cost: cost,
-          hasPurchased: p1.hasPurchased ?? (p1.cost != null)
+          hasPurchased: p1.hasPurchased ?? p1.cost != null
         });
       }
     }
   }
-  
+
   interpolated.push(data[data.length - 1]);
   return interpolated;
 };

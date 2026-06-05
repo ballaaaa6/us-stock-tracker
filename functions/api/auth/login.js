@@ -4,7 +4,7 @@ async function hashPassword(password) {
   const data = encoder.encode(password + "dime_app_salt_2026!");
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
   return hashHex;
 }
 
@@ -25,10 +25,10 @@ export async function onRequestPost(context) {
     const { username, password } = await request.json();
 
     if (!username || !password) {
-      return new Response(
-        JSON.stringify({ error: "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน" }),
-        { status: 400, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ error: "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน" }), {
+        status: 400,
+        headers: corsHeaders
+      });
     }
 
     const cleanUsername = username.trim().toLowerCase();
@@ -39,13 +39,16 @@ export async function onRequestPost(context) {
     // Try Supabase first (for hosted environment)
     if (SUPABASE_SERVICE_KEY && SUPABASE_URL) {
       try {
-        const supabaseRes = await fetch(`${SUPABASE_URL}/rest/v1/users?username=eq.${encodeURIComponent(cleanUsername)}`, {
-          headers: {
-            "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
-            "apikey": SUPABASE_SERVICE_KEY,
-            "Content-Type": "application/json"
+        const supabaseRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/users?username=eq.${encodeURIComponent(cleanUsername)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+              apikey: SUPABASE_SERVICE_KEY,
+              "Content-Type": "application/json"
+            }
           }
-        });
+        );
 
         if (supabaseRes.ok) {
           const users = await supabaseRes.json();
@@ -79,10 +82,7 @@ export async function onRequestPost(context) {
     }
 
     if (!userJson) {
-      return new Response(
-        JSON.stringify({ error: "ไม่พบชื่อผู้ใช้นี้ในระบบ" }),
-        { status: 401, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ error: "ไม่พบชื่อผู้ใช้นี้ในระบบ" }), { status: 401, headers: corsHeaders });
     }
 
     const user = JSON.parse(userJson);
@@ -90,10 +90,10 @@ export async function onRequestPost(context) {
     // Verify password hash
     const inputHash = await hashPassword(password);
     if (user.passwordHash !== inputHash) {
-      return new Response(
-        JSON.stringify({ error: "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง" }),
-        { status: 401, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ error: "รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง" }), {
+        status: 401,
+        headers: corsHeaders
+      });
     }
 
     // Login successful - return a session token
@@ -106,12 +106,11 @@ export async function onRequestPost(context) {
       }),
       { status: 200, headers: corsHeaders }
     );
-
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์: " + err.message }),
-      { status: 500, headers: corsHeaders }
-    );
+    return new Response(JSON.stringify({ error: "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์: " + err.message }), {
+      status: 500,
+      headers: corsHeaders
+    });
   }
 }
 

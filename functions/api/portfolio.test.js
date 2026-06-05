@@ -87,7 +87,10 @@ describe("portfolio API", () => {
   });
 
   it("should update portfolio and return 200 when body is a valid array (POST)", async () => {
-    const portfolioData = [{ symbol: "TSLA", qty: 5 }, { symbol: "NVDA", qty: 25 }];
+    const portfolioData = [
+      { symbol: "TSLA", qty: 5 },
+      { symbol: "NVDA", qty: 25 }
+    ];
     const context = makeContext("POST", "user-uuid-123", portfolioData);
     const response = await onRequest(context);
     expect(response.status).toBe(200);

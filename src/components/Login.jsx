@@ -52,7 +52,6 @@ export default function Login({ onLoginSuccess, onNavigateToRegister, showToast 
 
       // Trigger parent handler to display dashboard
       onLoginSuccess(data);
-
     } catch (err) {
       showToast(err.message, "error");
     } finally {
@@ -64,10 +63,8 @@ export default function Login({ onLoginSuccess, onNavigateToRegister, showToast 
     <div className="auth-wrapper fade-in">
       <div className="auth-card">
         {/* App Logo */}
-        <div className="auth-logo">
-          AG
-        </div>
-        
+        <div className="auth-logo">AG</div>
+
         <h1 className="auth-title">ยินดีต้อนรับสู่ Antigravity Tracker</h1>
         <p className="auth-subtitle">ระบบติดตามพอร์ตสินทรัพย์สหรัฐ คริปโต ทองคำ และเงินสด</p>
 
@@ -76,15 +73,15 @@ export default function Login({ onLoginSuccess, onNavigateToRegister, showToast 
           <div className="form-group">
             <label className="form-label">ชื่อผู้ใช้งาน</label>
             <div style={{ position: "relative" }}>
-              <User 
-                size={18} 
-                style={{ 
-                  position: "absolute", 
-                  left: "16px", 
-                  top: "50%", 
-                  transform: "translateY(-50%)", 
-                  color: "#64748B" 
-                }} 
+              <User
+                size={18}
+                style={{
+                  position: "absolute",
+                  left: "16px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#64748B"
+                }}
               />
               <input
                 type="text"
@@ -102,15 +99,15 @@ export default function Login({ onLoginSuccess, onNavigateToRegister, showToast 
           <div className="form-group" style={{ marginBottom: "32px" }}>
             <label className="form-label">รหัสผ่าน</label>
             <div style={{ position: "relative" }}>
-              <Lock 
-                size={18} 
-                style={{ 
-                  position: "absolute", 
-                  left: "16px", 
-                  top: "50%", 
-                  transform: "translateY(-50%)", 
-                  color: "#64748B" 
-                }} 
+              <Lock
+                size={18}
+                style={{
+                  position: "absolute",
+                  left: "16px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#64748B"
+                }}
               />
               <input
                 type={showPassword ? "text" : "password"}
@@ -152,12 +149,7 @@ export default function Login({ onLoginSuccess, onNavigateToRegister, showToast 
         {/* Navigation to Register */}
         <div style={{ marginTop: "24px", fontSize: "14px", color: "#64748B" }}>
           ยังไม่มีบัญชีใช้งานพอร์ต?{" "}
-          <button 
-            type="button" 
-            className="btn-text" 
-            onClick={onNavigateToRegister}
-            disabled={loading}
-          >
+          <button type="button" className="btn-text" onClick={onNavigateToRegister} disabled={loading}>
             สมัครสมาชิกใหม่ที่นี่
           </button>
         </div>

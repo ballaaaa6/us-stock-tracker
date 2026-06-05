@@ -17,10 +17,10 @@
 
 // ─── CORS headers ────────────────────────────────────────────────────────────
 const CORS = {
-  "Access-Control-Allow-Origin":  "*",
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Content-Type":                 "application/json",
+  "Content-Type": "application/json"
 };
 
 // ─── Prompt & Schema Context ──────────────────────────────────────────────────
@@ -120,7 +120,9 @@ function parseThaiDateToISO(rawStr) {
   if (!rawStr || typeof rawStr !== "string") return "";
 
   // 1. Try to match Thai Date layout with explicit months: e.g. "22 ก.ค. 68" or "22 ก.ค. 2025" or "22ก.ค.68"
-  const dayMatch = rawStr.match(/(?:ณ\s+|ส่งคำสั่ง\s+|สำเร็จ\s+)?(\d{1,2})\s*(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.|ม\.ค|ก\.พ|มี\.ค|เม\.ย|พ\.ค|มิ\.ย|ก\.ค|ส\.ค|ก\.ย|ต\.ค|พ\.ย|ธ\.ค|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s*(\d{2,4})/);
+  const dayMatch = rawStr.match(
+    /(?:ณ\s+|ส่งคำสั่ง\s+|สำเร็จ\s+)?(\d{1,2})\s*(ม\.ค\.|ก\.พ\.|มี\.ค\.|เม\.ย\.|พ\.ค\.|มิ\.ย\.|ก\.ค\.|ส\.ค\.|ก\.ย\.|ต\.ค\.|พ\.ย\.|ธ\.ค\.|ม\.ค|ก\.พ|มี\.ค|เม\.ย|พ\.ค|มิ\.ย|ก\.ค|ส\.ค|ก\.ย|ต\.ค|พ\.ย|ธ\.ค|มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s*(\d{2,4})/
+  );
   const timeMatch = rawStr.match(/(\d{1,2}):(\d{2})/);
 
   let year = "";
@@ -133,18 +135,42 @@ function parseThaiDateToISO(rawStr) {
     const yStr = dayMatch[3].trim();
 
     const monthMap = {
-      "ม.ค.": "01", "ม.ค": "01", "มกราคม": "01",
-      "ก.พ.": "02", "ก.พ": "02", "กุมภาพันธ์": "02",
-      "มี.ค.": "03", "มี.ค": "03", "มีนาคม": "03",
-      "เม.ย.": "04", "เม.ย": "04", "เมษายน": "04",
-      "พ.ค.": "05", "พ.ค": "05", "พฤษภาคม": "05",
-      "มิ.ย.": "06", "มิ.ย": "06", "มิถุนายน": "06",
-      "ก.ค.": "07", "ก.ค": "07", "กรกฎาคม": "07",
-      "ส.ค.": "08", "ส.ค": "08", "สิงหาคม": "08",
-      "ก.ย.": "09", "ก.ย": "09", "กันยายน": "09",
-      "ต.ค.": "10", "ต.ค": "10", "ตุลาคม": "10",
-      "พ.ย.": "11", "พ.ย": "11", "พฤศจิกายน": "11",
-      "ธ.ค.": "12", "ธ.ค": "12", "ธันวาคม": "12"
+      "ม.ค.": "01",
+      "ม.ค": "01",
+      มกราคม: "01",
+      "ก.พ.": "02",
+      "ก.พ": "02",
+      กุมภาพันธ์: "02",
+      "มี.ค.": "03",
+      "มี.ค": "03",
+      มีนาคม: "03",
+      "เม.ย.": "04",
+      "เม.ย": "04",
+      เมษายน: "04",
+      "พ.ค.": "05",
+      "พ.ค": "05",
+      พฤษภาคม: "05",
+      "มิ.ย.": "06",
+      "มิ.ย": "06",
+      มิถุนายน: "06",
+      "ก.ค.": "07",
+      "ก.ค": "07",
+      กรกฎาคม: "07",
+      "ส.ค.": "08",
+      "ส.ค": "08",
+      สิงหาคม: "08",
+      "ก.ย.": "09",
+      "ก.ย": "09",
+      กันยายน: "09",
+      "ต.ค.": "10",
+      "ต.ค": "10",
+      ตุลาคม: "10",
+      "พ.ย.": "11",
+      "พ.ย": "11",
+      พฤศจิกายน: "11",
+      "ธ.ค.": "12",
+      "ธ.ค": "12",
+      ธันวาคม: "12"
     };
 
     month = monthMap[mStr] || monthMap[mStr + "."] || "";
@@ -268,7 +294,9 @@ function validateSlipData(raw) {
   }
 
   // 2. Parse Symbol
-  let symbol = String(raw.symbol || "").trim().toUpperCase();
+  let symbol = String(raw.symbol || "")
+    .trim()
+    .toUpperCase();
   if (!symbol && header) {
     const match = header.match(/(?:ซื้อ|ขาย)\s*([A-Z0-9.\-]+)/i);
     if (match) {
@@ -299,11 +327,18 @@ function validateSlipData(raw) {
   const valueStr = String(raw.stock_value || "").toLowerCase();
   const headerStr = String(raw.header_text || "").toLowerCase();
   const statusStr = String(raw.status_text || "").toLowerCase();
-  const hasTHBUnit = boldStr.includes("บาท") || boldStr.includes("thb") || boldStr.includes("฿") ||
-                     valueStr.includes("บาท") || valueStr.includes("thb") || valueStr.includes("฿") ||
-                     headerStr.includes("บาท") || headerStr.includes("thb") ||
-                     statusStr.includes("บาท") || statusStr.includes("thb") ||
-                     exchangeRate > 0;
+  const hasTHBUnit =
+    boldStr.includes("บาท") ||
+    boldStr.includes("thb") ||
+    boldStr.includes("฿") ||
+    valueStr.includes("บาท") ||
+    valueStr.includes("thb") ||
+    valueStr.includes("฿") ||
+    headerStr.includes("บาท") ||
+    headerStr.includes("thb") ||
+    statusStr.includes("บาท") ||
+    statusStr.includes("thb") ||
+    exchangeRate > 0;
 
   if (price <= 0) return null;
 
@@ -320,7 +355,8 @@ function validateSlipData(raw) {
   let share_amount = 0;
 
   // 4.1 Check if bold_amount directly contains the share count
-  const isBoldUnitCount = boldText.includes("หุ้น") || boldText.includes("หน่วย") || boldText.includes("share") || boldText.includes("unit");
+  const isBoldUnitCount =
+    boldText.includes("หุ้น") || boldText.includes("หน่วย") || boldText.includes("share") || boldText.includes("unit");
 
   if (isBoldUnitCount && boldNum > 0) {
     // ══ Layouts B, C, D: Bold text contains the share count ══
@@ -428,7 +464,7 @@ function parseTimestamp(ts) {
     if (isNaN(d.getTime())) return { date: new Date().toISOString().split("T")[0], time: "" };
     const date = d.toISOString().split("T")[0];
     const hhmm = d.toISOString().split("T")[1].slice(0, 5);
-    const time  = hhmm === "00:00" ? "" : hhmm;
+    const time = hhmm === "00:00" ? "" : hhmm;
     return { date, time };
   } catch {
     return { date: new Date().toISOString().split("T")[0], time: "" };
@@ -444,37 +480,35 @@ function mergeLotIntoPortfolio(portfolio, slip) {
   const lotQty = isSell ? -Math.abs(slip.share_amount) : Math.abs(slip.share_amount);
 
   const newLot = {
-    id:    `scan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     date,
     time,
-    qty:   lotQty,
-    price: slip.actual_price,
+    qty: lotQty,
+    price: slip.actual_price
   };
 
-  const existingIdx = portfolio.findIndex(
-    (a) => a.symbol.toUpperCase() === slip.symbol.toUpperCase()
-  );
+  const existingIdx = portfolio.findIndex((a) => a.symbol.toUpperCase() === slip.symbol.toUpperCase());
 
   if (existingIdx >= 0) {
     const existing = portfolio[existingIdx];
-    const allLots  = [...(existing.lots || []), newLot];
+    const allLots = [...(existing.lots || []), newLot];
     const totalQty = allLots.reduce((s, l) => s + l.qty, 0);
 
-    const buyLots  = allLots.filter((l) => l.qty > 0);
-    const buyQty   = buyLots.reduce((s, l) => s + l.qty, 0);
-    const buyCost  = buyLots.reduce((s, l) => s + l.qty * l.price, 0);
-    const avgCost  = buyQty > 0 ? buyCost / buyQty : existing.avgCost || 0;
+    const buyLots = allLots.filter((l) => l.qty > 0);
+    const buyQty = buyLots.reduce((s, l) => s + l.qty, 0);
+    const buyCost = buyLots.reduce((s, l) => s + l.qty * l.price, 0);
+    const avgCost = buyQty > 0 ? buyCost / buyQty : existing.avgCost || 0;
 
     portfolio[existingIdx] = { ...existing, lots: allLots, qty: totalQty, avgCost };
   } else {
     portfolio.push({
-      id:       `asset-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      symbol:   slip.symbol,
-      name:     slip.symbol,
+      id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      symbol: slip.symbol,
+      name: slip.symbol,
       category: "stock",
-      lots:     [newLot],
-      qty:      lotQty,
-      avgCost:  slip.actual_price,
+      lots: [newLot],
+      qty: lotQty,
+      avgCost: slip.actual_price
     });
   }
 
@@ -512,7 +546,10 @@ async function callWorkersAIVision(ai, base64, mime) {
           {
             role: "user",
             content: [
-              { type: "text", text: "Extract the transaction data from this receipt image. Your response MUST be ONLY a raw JSON object matching the schema, with no conversational filler or markdown blocks. Start directly with '{'." },
+              {
+                type: "text",
+                text: "Extract the transaction data from this receipt image. Your response MUST be ONLY a raw JSON object matching the schema, with no conversational filler or markdown blocks. Start directly with '{'."
+              },
               { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } }
             ]
           }
@@ -532,7 +569,11 @@ async function callWorkersAIVision(ai, base64, mime) {
       return await ai.run(modelName, {
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: "Extract the transaction data from this receipt image. Your response MUST be ONLY a raw JSON object matching the schema, with no conversational filler or markdown blocks. Start directly with '{'." }
+          {
+            role: "user",
+            content:
+              "Extract the transaction data from this receipt image. Your response MUST be ONLY a raw JSON object matching the schema, with no conversational filler or markdown blocks. Start directly with '{'."
+          }
         ],
         image: imageBytes,
         max_tokens: maxTokens,
@@ -559,7 +600,7 @@ async function callWorkersAIVision(ai, base64, mime) {
           resultText = choice.text;
         }
       }
-      
+
       // Legacy or custom formats fallback
       if (!resultText) {
         if (typeof res.response === "string") {
@@ -586,7 +627,13 @@ async function callWorkersAIVision(ai, base64, mime) {
     response = await runModel(primaryModel, 2048);
   } catch (err) {
     // If license agreement error
-    if (err.message && (err.message.includes("5016") || err.message.includes("license") || err.message.includes("agree") || err.message.includes("Acceptable Use Policy"))) {
+    if (
+      err.message &&
+      (err.message.includes("5016") ||
+        err.message.includes("license") ||
+        err.message.includes("agree") ||
+        err.message.includes("Acceptable Use Policy"))
+    ) {
       try {
         console.log(`Agreeing to terms for model: ${primaryModel}`);
         try {
@@ -596,7 +643,7 @@ async function callWorkersAIVision(ai, base64, mime) {
             throw agreeErr;
           }
         }
-        await new Promise(r => setTimeout(r, 1200));
+        await new Promise((r) => setTimeout(r, 1200));
         response = await runModel(primaryModel, 2048);
       } catch (retryErr) {
         console.warn(`Primary model failed after license agreement: ${retryErr.message}. Falling back to backup.`);
@@ -617,7 +664,9 @@ async function callWorkersAIVision(ai, base64, mime) {
         parsedJson = JSON.parse(match[0]);
         // Schema check: verify that this is not a wrapper object and contains expected fields
         if (!parsedJson.bold_amount && !parsedJson.symbol && !parsedJson.actual_price) {
-          console.warn("Primary model returned JSON but it doesn't match expected receipt schema fields. Falling back.");
+          console.warn(
+            "Primary model returned JSON but it doesn't match expected receipt schema fields. Falling back."
+          );
           parsedJson = null;
         }
       }
@@ -634,7 +683,13 @@ async function callWorkersAIVision(ai, base64, mime) {
     try {
       response = await runModel(backupModel, 512);
     } catch (err) {
-      if (err.message && (err.message.includes("5016") || err.message.includes("license") || err.message.includes("agree") || err.message.includes("Acceptable Use Policy"))) {
+      if (
+        err.message &&
+        (err.message.includes("5016") ||
+          err.message.includes("license") ||
+          err.message.includes("agree") ||
+          err.message.includes("Acceptable Use Policy"))
+      ) {
         try {
           console.log(`Agreeing to terms for model: ${backupModel}`);
           try {
@@ -644,7 +699,7 @@ async function callWorkersAIVision(ai, base64, mime) {
               throw agreeErr;
             }
           }
-          await new Promise(r => setTimeout(r, 1200));
+          await new Promise((r) => setTimeout(r, 1200));
           response = await runModel(backupModel, 512);
         } catch (retryErr) {
           throw new Error(`Backup model run failed after license agreement: ${retryErr.message}`);
@@ -701,16 +756,13 @@ export async function onRequestPost(context) {
     }
 
     if (!Array.isArray(images) || images.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "images array is required and must not be empty" }),
-        { status: 400, headers: CORS }
-      );
+      return new Response(JSON.stringify({ error: "images array is required and must not be empty" }), {
+        status: 400,
+        headers: CORS
+      });
     }
     if (images.length > 10) {
-      return new Response(
-        JSON.stringify({ error: "Maximum 10 images per request" }),
-        { status: 400, headers: CORS }
-      );
+      return new Response(JSON.stringify({ error: "Maximum 10 images per request" }), { status: 400, headers: CORS });
     }
 
     // ── Load existing portfolio from KV ───────────────────────────────────────
@@ -726,7 +778,7 @@ export async function onRequestPost(context) {
 
     // ── Process each image via Workers AI ─────────────────────────────────────
     const results = [];
-    const errors  = [];
+    const errors = [];
 
     for (let i = 0; i < images.length; i++) {
       const { base64, mime } = images[i];
@@ -743,9 +795,7 @@ export async function onRequestPost(context) {
 
         const validated = validateSlipData(parsed);
         if (!validated) {
-          throw new Error(
-            `Extracted data is incomplete or invalid: ${JSON.stringify(parsed).slice(0, 120)}`
-          );
+          throw new Error(`Extracted data is incomplete or invalid: ${JSON.stringify(parsed).slice(0, 120)}`);
         }
 
         // Merge into portfolio if not skipping save
@@ -754,7 +804,6 @@ export async function onRequestPost(context) {
         }
 
         results.push({ index: i, ...validated, raw_ai: parsed, saved: !skipSave, engine: "Cloudflare Workers AI" });
-
       } catch (imgErr) {
         errors.push({ index: i, error: imgErr.message });
       }
@@ -765,16 +814,9 @@ export async function onRequestPost(context) {
       await PORTFOLIOS.put(`portfolio:${userId}`, JSON.stringify(portfolio));
     }
 
-    return new Response(
-      JSON.stringify({ results, errors }),
-      { status: 200, headers: CORS }
-    );
-
+    return new Response(JSON.stringify({ results, errors }), { status: 200, headers: CORS });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { status: 500, headers: CORS }
-    );
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: CORS });
   }
 }
 

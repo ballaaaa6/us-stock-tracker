@@ -17,10 +17,13 @@ export const fmtUSD = (n, hideValues = false) => {
 export const fmtTHB = (n, decimals = 2, hideValues = false) => {
   if (hideValues) return "****";
   if (n == null) return "—";
-  return "฿" + new Intl.NumberFormat("th-TH", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
-  }).format(n);
+  return (
+    "฿" +
+    new Intl.NumberFormat("th-TH", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    }).format(n)
+  );
 };
 
 export const fmtPct = (n) => {
@@ -68,12 +71,20 @@ export const getDynamicDateFormat = (dateIso, visibleDurationMs, hasMultipleYear
   }
 
   if (isTooltip && hasTime) {
-    return d.toLocaleDateString("th-TH", { day: "numeric", month: "short" }) + " " + d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+    return (
+      d.toLocaleDateString("th-TH", { day: "numeric", month: "short" }) +
+      " " +
+      d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })
+    );
   }
 
   if (visibleDurationMs <= sixMonths) {
     return d.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
   } else {
-    return d.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: hasMultipleYears ? "2-digit" : undefined });
+    return d.toLocaleDateString("th-TH", {
+      day: "numeric",
+      month: "short",
+      year: hasMultipleYears ? "2-digit" : undefined
+    });
   }
 };

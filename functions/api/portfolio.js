@@ -17,18 +17,15 @@ export async function onRequest(context) {
   // 1. Authenticate user using the Bearer token (which is the user's secure UUID)
   const authHeader = request.headers.get("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return new Response(
-      JSON.stringify({ error: "ไม่พบสิทธิ์การใช้งาน กรุณาเข้าสู่ระบบก่อน" }),
-      { status: 401, headers: corsHeaders }
-    );
+    return new Response(JSON.stringify({ error: "ไม่พบสิทธิ์การใช้งาน กรุณาเข้าสู่ระบบก่อน" }), {
+      status: 401,
+      headers: corsHeaders
+    });
   }
 
   const userId = authHeader.split(" ")[1].trim();
   if (!userId) {
-    return new Response(
-      JSON.stringify({ error: "โทเค็นการใช้งานไม่ถูกต้อง" }),
-      { status: 401, headers: corsHeaders }
-    );
+    return new Response(JSON.stringify({ error: "โทเค็นการใช้งานไม่ถูกต้อง" }), { status: 401, headers: corsHeaders });
   }
 
   try {
@@ -49,30 +46,26 @@ export async function onRequest(context) {
       const assets = await request.json();
 
       if (!Array.isArray(assets)) {
-        return new Response(
-          JSON.stringify({ error: "รูปแบบข้อมูลพอร์ตไม่ถูกต้อง" }),
-          { status: 400, headers: corsHeaders }
-        );
+        return new Response(JSON.stringify({ error: "รูปแบบข้อมูลพอร์ตไม่ถูกต้อง" }), {
+          status: 400,
+          headers: corsHeaders
+        });
       }
 
       // Save to KV
       await PORTFOLIOS.put(`portfolio:${userId}`, JSON.stringify(assets));
 
-      return new Response(
-        JSON.stringify({ message: "บันทึกพอร์ตเรียบร้อยแล้ว!" }),
-        { status: 200, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ message: "บันทึกพอร์ตเรียบร้อยแล้ว!" }), {
+        status: 200,
+        headers: corsHeaders
+      });
     }
 
-    return new Response(
-      JSON.stringify({ error: "Method Not Allowed" }),
-      { status: 405, headers: corsHeaders }
-    );
-
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), { status: 405, headers: corsHeaders });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "เกิดข้อผิดพลาดในการโหลดข้อมูล: " + err.message }),
-      { status: 500, headers: corsHeaders }
-    );
+    return new Response(JSON.stringify({ error: "เกิดข้อผิดพลาดในการโหลดข้อมูล: " + err.message }), {
+      status: 500,
+      headers: corsHeaders
+    });
   }
 }

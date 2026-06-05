@@ -10,7 +10,9 @@
     "local-api": "wrangler pages dev dist --kv=PORTFOLIOS --live-reload --compatibility-date 2025-07-18",
     "serve": "npm run build; npx wrangler pages dev dist --port 8788 --compatibility-date 2025-07-18",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "format": "prettier --write \"src/**/*.{js,jsx,css}\" \"functions/**/*.js\"",
+    "lint": "eslint src functions"
   },
   "dependencies": {
     "lucide-react": "^0.344.0",
@@ -21,6 +23,9 @@
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^10.4.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.3",
     "vite": "^5.1.6",
     "vitest": "^4.1.8",
     "wrangler": "^3.32.0"

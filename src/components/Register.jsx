@@ -11,7 +11,7 @@ export default function Register({ onNavigateToLogin, showToast }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const cleanUser = username.trim();
     if (!cleanUser || !password || !confirmPassword) {
       showToast("กรุณากรอกข้อมูลให้ครบถ้วนในทุกช่อง", "error");
@@ -39,7 +39,6 @@ export default function Register({ onNavigateToLogin, showToast }) {
 
       showToast(data.message || "สมัครสมาชิกเสร็จสมบูรณ์!", "success");
       onNavigateToLogin(); // Go back to login
-
     } catch (err) {
       showToast(err.message, "error");
     } finally {
@@ -74,10 +73,8 @@ export default function Register({ onNavigateToLogin, showToast }) {
         </button>
 
         {/* App Logo */}
-        <div className="auth-logo">
-          AG
-        </div>
-        
+        <div className="auth-logo">AG</div>
+
         <h1 className="auth-title">สมัครสมาชิกใหม่</h1>
         <p className="auth-subtitle">สร้างพอร์ตของคุณเองได้ฟรี ข้อมูลการเงินแยกบัญชี 100%</p>
 
@@ -86,15 +83,15 @@ export default function Register({ onNavigateToLogin, showToast }) {
           <div className="form-group">
             <label className="form-label">ชื่อผู้ใช้งานภาษาอังกฤษ (สำหรับล็อกอิน)</label>
             <div style={{ position: "relative" }}>
-              <User 
-                size={18} 
-                style={{ 
-                  position: "absolute", 
-                  left: "16px", 
-                  top: "50%", 
-                  transform: "translateY(-50%)", 
-                  color: "#64748B" 
-                }} 
+              <User
+                size={18}
+                style={{
+                  position: "absolute",
+                  left: "16px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#64748B"
+                }}
               />
               <input
                 type="text"
@@ -112,15 +109,15 @@ export default function Register({ onNavigateToLogin, showToast }) {
           <div className="form-group">
             <label className="form-label">รหัสผ่าน</label>
             <div style={{ position: "relative" }}>
-              <Lock 
-                size={18} 
-                style={{ 
-                  position: "absolute", 
-                  left: "16px", 
-                  top: "50%", 
-                  transform: "translateY(-50%)", 
-                  color: "#64748B" 
-                }} 
+              <Lock
+                size={18}
+                style={{
+                  position: "absolute",
+                  left: "16px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#64748B"
+                }}
               />
               <input
                 type={showPassword ? "text" : "password"}
@@ -156,15 +153,15 @@ export default function Register({ onNavigateToLogin, showToast }) {
           <div className="form-group" style={{ marginBottom: "32px" }}>
             <label className="form-label">ยืนยันรหัสผ่าน</label>
             <div style={{ position: "relative" }}>
-              <Lock 
-                size={18} 
-                style={{ 
-                  position: "absolute", 
-                  left: "16px", 
-                  top: "50%", 
-                  transform: "translateY(-50%)", 
-                  color: "#64748B" 
-                }} 
+              <Lock
+                size={18}
+                style={{
+                  position: "absolute",
+                  left: "16px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#64748B"
+                }}
               />
               <input
                 type={showPassword ? "text" : "password"}
@@ -179,7 +176,12 @@ export default function Register({ onNavigateToLogin, showToast }) {
           </div>
 
           {/* Register Button */}
-          <button type="submit" className="btn btn-primary" style={{ backgroundColor: "#00B98A", boxShadow: "0 8px 24px rgba(0, 185, 138, 0.2)" }} disabled={loading}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            style={{ backgroundColor: "#00B98A", boxShadow: "0 8px 24px rgba(0, 185, 138, 0.2)" }}
+            disabled={loading}
+          >
             {loading ? "กำลังสมัครสมาชิก..." : "เปิดบัญชีพอร์ตโฟลิโอฟรี"}
             {!loading && <UserPlus size={18} />}
           </button>
@@ -188,12 +190,7 @@ export default function Register({ onNavigateToLogin, showToast }) {
         {/* Toggle back to Login */}
         <div style={{ marginTop: "24px", fontSize: "14px", color: "#64748B" }}>
           มีบัญชีอยู่แล้ว?{" "}
-          <button 
-            type="button" 
-            className="btn-text" 
-            onClick={onNavigateToLogin}
-            disabled={loading}
-          >
+          <button type="button" className="btn-text" onClick={onNavigateToLogin} disabled={loading}>
             เข้าสู่ระบบที่นี่
           </button>
         </div>

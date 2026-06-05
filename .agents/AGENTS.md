@@ -24,6 +24,10 @@ Welcome to the US Stock Tracker project! This repository contains an `.agents/` 
 8. **Centralized API Client**: All frontend network requests to backend serverless endpoints `/api/*` MUST use the centralized client in [api.js](file:///d:/antigravity/us%20stock%20tracker/src/services/api.js).
    - DO NOT write inline `fetch` requests inside React UI components.
    - If a new backend endpoint is created, define a corresponding request method in [api.js](file:///d:/antigravity/us%20stock%20tracker/src/services/api.js) and update its unit tests in [api.test.js](file:///d:/antigravity/us%20stock%20tracker/src/services/api.test.js) before calling it in components.
+9. **Code Style & Formatting (Prettier & ESLint)**: Standardize all formatting using Prettier.
+   - Run `npm run format` to auto-format code prior to committing.
+   - Run `npm run lint` to verify that there are no syntax anomalies or unused imports.
+10. **Type Definitions & Documentation**: Refer to [types.js](file:///d:/antigravity/us%20stock%20tracker/src/utils/types.js) for structured definitions of system objects (`UserProfile`, `Asset`, `TradeLot`). Document any new utility functions using descriptive JSDoc block comments.
 
 ## Active Session Flow
 - Check `.agents/active.md` to see the current active task and branch.

@@ -1,13 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  fmtUSD,
-  fmtTHB,
-  fmtPct,
-  fmtQty,
-  fmtDate,
-  fmtDateShort,
-  getDynamicDateFormat
-} from "./formatters";
+import { fmtUSD, fmtTHB, fmtPct, fmtQty, fmtDate, fmtDateShort, getDynamicDateFormat } from "./formatters";
 
 describe("formatters", () => {
   describe("fmtUSD", () => {

@@ -11,7 +11,7 @@ describe("ocrParser - validateParsedReceipt", () => {
     const validData = {
       symbol: "  nvda  ",
       qty: 5,
-      price: 130.50,
+      price: 130.5,
       date: "2026-06-05",
       time: "15:30",
       transactionType: "BUY",
@@ -26,7 +26,7 @@ describe("ocrParser - validateParsedReceipt", () => {
     const invalidData = {
       symbol: "12345",
       qty: 5,
-      price: 130.50,
+      price: 130.5,
       date: "2026-06-05",
       time: "15:30",
       transactionType: "BUY"

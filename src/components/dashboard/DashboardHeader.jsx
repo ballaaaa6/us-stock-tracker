@@ -61,7 +61,10 @@ export default function DashboardHeader({
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontWeight: 800 }}>{portfolioName}</span>
               <button
-                onClick={() => { setTempName(portfolioName); setIsEditingName(true); }}
+                onClick={() => {
+                  setTempName(portfolioName);
+                  setIsEditingName(true);
+                }}
                 style={{
                   background: "transparent",
                   border: "none",
@@ -108,9 +111,7 @@ export default function DashboardHeader({
             ) : (
               <span style={{ fontSize: 13 }}>👤</span>
             )}
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--primary)" }}>
-              {nickname || user?.username}
-            </span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--primary)" }}>{nickname || user?.username}</span>
           </div>
           <button
             onClick={() => setProfileModalOpen(true)}

@@ -1,23 +1,31 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { api } from "../services/api";
-import { Plus, RefreshCw, LogOut, Trash2, Download, Upload, PieChart, Pencil, X, Settings, Eye, EyeOff, Sparkles } from "lucide-react";
+import {
+  Plus,
+  RefreshCw,
+  LogOut,
+  Trash2,
+  Download,
+  Upload,
+  PieChart,
+  Pencil,
+  X,
+  Settings,
+  Eye,
+  EyeOff,
+  Sparkles
+} from "lucide-react";
 import AssetModal from "./AssetModal";
 import AssetDetailPanel from "./AssetDetailPanel";
 
-import { 
-  fmtUSD, 
-  fmtTHB, 
-  fmtPct, 
-  fmtQty, 
-  fmtDate 
-} from "../utils/formatters";
+import { fmtUSD, fmtTHB, fmtPct, fmtQty, fmtDate } from "../utils/formatters";
 
-import { 
-  getDisplaySymbol, 
-  getAssetFullName, 
-  getCurrencyTicker, 
-  getCurrencyPriceUSD, 
-  getRealizedPnL 
+import {
+  getDisplaySymbol,
+  getAssetFullName,
+  getCurrencyTicker,
+  getCurrencyPriceUSD,
+  getRealizedPnL
 } from "../utils/assetHelpers";
 
 import DashboardHeader from "./dashboard/DashboardHeader";
@@ -78,82 +86,93 @@ export default function Dashboard({ user, onLogout, showToast }) {
     localStorage.setItem("hide_portfolio_values", hideValues ? "true" : "false");
   }, [hideValues]);
 
-  const [assets, setAssets]               = useState([]);
-  const [prices, setPrices]               = useState({});
-  const [sparklines, setSparklines]       = useState({});   // { SYM: { dates, closes } }
+  const [assets, setAssets] = useState([]);
+  const [prices, setPrices] = useState({});
+  const [sparklines, setSparklines] = useState({}); // { SYM: { dates, closes } }
   const [portfolioHistory, setPortfolioHistory] = useState([]); // [{date, value}]
-  const [exchangeRate, setExchangeRate]   = useState(35.0);
+  const [exchangeRate, setExchangeRate] = useState(35.0);
   const [historicalRates, setHistoricalRates] = useState({});
 
-  const fmt = useMemo(() => ({
-    usd:  (n) => fmtUSD(n, hideValues),
-    thb:  (n, decimals = 2) => fmtTHB(n, decimals, hideValues),
-    pct:  fmtPct,
-    qty:  (n) => fmtQty(n, hideValues),
-    date: fmtDate,
-  }), [hideValues]);
+  const fmt = useMemo(
+    () => ({
+      usd: (n) => fmtUSD(n, hideValues),
+      thb: (n, decimals = 2) => fmtTHB(n, decimals, hideValues),
+      pct: fmtPct,
+      qty: (n) => fmtQty(n, hideValues),
+      date: fmtDate
+    }),
+    [hideValues]
+  );
 
-  const getHistoricalRate = useCallback((dateStr) => {
-    if (!dateStr) return exchangeRate;
-    const targetDate = dateStr.split("T")[0];
-    if (historicalRates[targetDate]) {
-      return historicalRates[targetDate];
-    }
-    const dates = Object.keys(historicalRates).sort();
-    if (dates.length === 0) return exchangeRate;
-    let bestRate = exchangeRate;
-    for (const d of dates) {
-      if (d <= targetDate) {
-        bestRate = historicalRates[d];
-      } else {
-        break;
+  const getHistoricalRate = useCallback(
+    (dateStr) => {
+      if (!dateStr) return exchangeRate;
+      const targetDate = dateStr.split("T")[0];
+      if (historicalRates[targetDate]) {
+        return historicalRates[targetDate];
       }
-    }
-    return bestRate;
-  }, [historicalRates, exchangeRate]);
+      const dates = Object.keys(historicalRates).sort();
+      if (dates.length === 0) return exchangeRate;
+      let bestRate = exchangeRate;
+      for (const d of dates) {
+        if (d <= targetDate) {
+          bestRate = historicalRates[d];
+        } else {
+          break;
+        }
+      }
+      return bestRate;
+    },
+    [historicalRates, exchangeRate]
+  );
 
-  const getRealizedPnLInTHB = useCallback((lots, isThai) => {
-    if (!lots || !lots.length) return 0;
-    const sortedLots = [...lots].sort((a, b) => new Date(a.date) - new Date(b.date));
-    let realizedTHB = 0;
-    let currentQty = 0;
-    let currentAvgCostUSD = 0;
-    for (const lot of sortedLots) {
-      const lotQty = lot.qty;
-      let lotPriceUSD = lot.price || 0;
-      const txRate = getHistoricalRate(lot.date);
-      if (isThai && txRate) {
-        lotPriceUSD = lotPriceUSD / txRate;
+  const getRealizedPnLInTHB = useCallback(
+    (lots, isThai) => {
+      if (!lots || !lots.length) return 0;
+      const sortedLots = [...lots].sort((a, b) => new Date(a.date) - new Date(b.date));
+      let realizedTHB = 0;
+      let currentQty = 0;
+      let currentAvgCostUSD = 0;
+      for (const lot of sortedLots) {
+        const lotQty = lot.qty;
+        let lotPriceUSD = lot.price || 0;
+        const txRate = getHistoricalRate(lot.date);
+        if (isThai && txRate) {
+          lotPriceUSD = lotPriceUSD / txRate;
+        }
+        if (lotQty > 0) {
+          const newQty = currentQty + lotQty;
+          const newCost = currentQty * currentAvgCostUSD + lotQty * lotPriceUSD;
+          currentAvgCostUSD = newQty > 0 ? newCost / newQty : 0;
+          currentQty = newQty;
+        } else if (lotQty < 0) {
+          const sellQty = Math.abs(lotQty);
+          const gainUSD = (lotPriceUSD - currentAvgCostUSD) * sellQty;
+          const gainTHB = gainUSD * txRate;
+          realizedTHB += gainTHB;
+          currentQty = Math.max(0, currentQty - sellQty);
+        }
       }
-      if (lotQty > 0) {
-        const newQty = currentQty + lotQty;
-        const newCost = (currentQty * currentAvgCostUSD) + (lotQty * lotPriceUSD);
-        currentAvgCostUSD = newQty > 0 ? newCost / newQty : 0;
-        currentQty = newQty;
-      } else if (lotQty < 0) {
-        const sellQty = Math.abs(lotQty);
-        const gainUSD = (lotPriceUSD - currentAvgCostUSD) * sellQty;
-        const gainTHB = gainUSD * txRate;
-        realizedTHB += gainTHB;
-        currentQty = Math.max(0, currentQty - sellQty);
-      }
-    }
-    return realizedTHB;
-  }, [getHistoricalRate]);
+      return realizedTHB;
+    },
+    [getHistoricalRate]
+  );
 
-  const [loading, setLoading]             = useState(true);
-  const [refreshing, setRefreshing]       = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [sparklineLoading, setSparklineLoading] = useState(false);
-  const [autoRefresh, setAutoRefresh]     = useState(true);
-  const [chartRange, setChartRange]       = useState("1D");
-  const [sortConfig, setSortConfig]       = useState({ key: "value", dir: "desc" });
-  const [priceFlash, setPriceFlash]       = useState({});   // { SYM: "up"|"down" }
-  const [modalOpen, setModalOpen]         = useState(false);
-  const [editingAsset, setEditingAsset]   = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [chartRange, setChartRange] = useState("1D");
+  const [sortConfig, setSortConfig] = useState({ key: "value", dir: "desc" });
+  const [priceFlash, setPriceFlash] = useState({}); // { SYM: "up"|"down" }
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingAsset, setEditingAsset] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
-  const [portfolioName, setPortfolioName] = useState(() => localStorage.getItem(`portfolio_name_${user.username}`) || "StockVault");
+  const [portfolioName, setPortfolioName] = useState(
+    () => localStorage.getItem(`portfolio_name_${user.username}`) || "StockVault"
+  );
   const [isEditingName, setIsEditingName] = useState(false);
-  const [tempName, setTempName]           = useState("");
+  const [tempName, setTempName] = useState("");
   const [showPnLDetailsModal, setShowPnLDetailsModal] = useState(false);
 
   const syncProfileToServer = async (name, pic, nick) => {
@@ -203,17 +222,17 @@ export default function Dashboard({ user, onLogout, showToast }) {
   };
 
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [profilePic, setProfilePic]             = useState(() => localStorage.getItem(`profile_pic_${user.username}`) || "");
+  const [profilePic, setProfilePic] = useState(() => localStorage.getItem(`profile_pic_${user.username}`) || "");
   const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
-  const [avatarHovered, setAvatarHovered]         = useState(false);
-  const [presetModalOpen, setPresetModalOpen]     = useState(false);
+  const [avatarHovered, setAvatarHovered] = useState(false);
+  const [presetModalOpen, setPresetModalOpen] = useState(false);
   const [donutDrillCategory, setDonutDrillCategory] = useState(null);
-  const [nickname, setNickname]                 = useState(() => localStorage.getItem(`profile_nickname_${user.username}`) || "");
+  const [nickname, setNickname] = useState(() => localStorage.getItem(`profile_nickname_${user.username}`) || "");
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem("gemini_api_key") || "");
 
-  const [newNickname, setNewNickname]           = useState("");
-  const [oldPassword, setOldPassword]           = useState("");
-  const [newPassword, setNewPassword]           = useState("");
+  const [newNickname, setNewNickname] = useState("");
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
     if (profileModalOpen) {
@@ -304,10 +323,12 @@ export default function Dashboard({ user, onLogout, showToast }) {
   assetsRef.current = assets;
 
   const handleClearAsset = async (assetId) => {
-    const asset = assets.find(a => a.id === assetId);
+    const asset = assets.find((a) => a.id === assetId);
     if (!asset) return;
 
-    const displaySym = asset.broker ? `${getDisplaySymbol(asset.symbol)} (${asset.broker})` : getDisplaySymbol(asset.symbol);
+    const displaySym = asset.broker
+      ? `${getDisplaySymbol(asset.symbol)} (${asset.broker})`
+      : getDisplaySymbol(asset.symbol);
     const confirmMsg = `คุณแน่ใจหรือไม่ที่จะล้างผลตอบแทนสะสมที่รับรู้แล้ว (Realized P&L) ของ ${displaySym} ให้กลับไปเป็น 0? \n\nการดำเนินการนี้จะล้างเฉพาะค่าผลตอบแทนสะสมในอดีต โดยจะไม่ส่งผลกระทบใดๆ ต่อรายการประวัติการซื้อขายดั้งเดิม หรือจำนวนหุ้นที่คุณถืออยู่ปัจจุบัน`;
     if (!confirm(confirmMsg)) return;
 
@@ -315,7 +336,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
     const rawRealized = getRealizedPnL(asset.lots || [], isThai, exchangeRate);
     const rawRealizedTHB = getRealizedPnLInTHB(asset.lots || [], isThai);
 
-    const updatedAssets = assets.map(a => {
+    const updatedAssets = assets.map((a) => {
       if (a.id === assetId) {
         return {
           ...a,
@@ -334,14 +355,18 @@ export default function Dashboard({ user, onLogout, showToast }) {
 
   const handleDeleteAsset = async (param, fromModal = false) => {
     const assetId = typeof param === "string" ? param : param?.id;
-    const asset = assets.find(a => a.id === assetId);
+    const asset = assets.find((a) => a.id === assetId);
     if (!asset) return;
 
-    const displaySym = asset.broker ? `${getDisplaySymbol(asset.symbol)} (${asset.broker})` : getDisplaySymbol(asset.symbol);
+    const displaySym = asset.broker
+      ? `${getDisplaySymbol(asset.symbol)} (${asset.broker})`
+      : getDisplaySymbol(asset.symbol);
 
     if (fromModal) {
       if (asset.qty > 0) {
-        alert(`❌ ไม่สามารถลบ ${displaySym} จากหน้ากำไร/ขาดทุนรายตัวได้เนื่องจากยังมีหุ้นเหลืออยู่บนหน้าหลัก (${asset.qty} หน่วย)\n\nกรุณาลบจากหน้ากระดานหลัก หรือทำธุรกรรมขายออกให้หมดก่อน`);
+        alert(
+          `❌ ไม่สามารถลบ ${displaySym} จากหน้ากำไร/ขาดทุนรายตัวได้เนื่องจากยังมีหุ้นเหลืออยู่บนหน้าหลัก (${asset.qty} หน่วย)\n\nกรุณาลบจากหน้ากระดานหลัก หรือทำธุรกรรมขายออกให้หมดก่อน`
+        );
         return;
       }
     }
@@ -349,7 +374,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
     const confirmMsg = `คุณแน่ใจหรือไม่ที่จะลบสินทรัพย์ ${displaySym} และประวัติธุรกรรมทั้งหมดออกอย่างถาวร?`;
     if (!confirm(confirmMsg)) return;
 
-    const updatedAssets = assets.filter(a => a.id !== assetId);
+    const updatedAssets = assets.filter((a) => a.id !== assetId);
     try {
       await savePortfolio(updatedAssets);
       await fetchPrices(updatedAssets);
@@ -397,7 +422,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
     setRefreshing(true);
     try {
       const symbols = portfolioAssets
-        .map(a => {
+        .map((a) => {
           const isCashAsset = a.type === "fiat" || a.category === "fiat";
           if (isCashAsset) {
             if (a.symbol === "USD") return null;
@@ -426,7 +451,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
 
         // Detect price changes for flash animation
         const flash = {};
-        Object.keys(newPrices).forEach(sym => {
+        Object.keys(newPrices).forEach((sym) => {
           const prev = prevPricesRef.current[sym]?.price;
           const curr = newPrices[sym]?.price;
           if (prev != null && curr != null && curr !== prev) {
@@ -445,11 +470,13 @@ export default function Dashboard({ user, onLogout, showToast }) {
         const newPrices = { ...prevPricesRef.current };
         const symList = symbols ? symbols.split(",") : [];
 
-        symList.forEach(s => {
+        symList.forEach((s) => {
           const cleanSym = s.toUpperCase();
           let basePrice = 100.0;
 
-          const matchAsset = portfolioAssets.find(a => a.symbol.toUpperCase() === cleanSym || getCurrencyTicker(a.symbol).toUpperCase() === cleanSym);
+          const matchAsset = portfolioAssets.find(
+            (a) => a.symbol.toUpperCase() === cleanSym || getCurrencyTicker(a.symbol).toUpperCase() === cleanSym
+          );
           if (matchAsset) {
             basePrice = matchAsset.avgCost || matchAsset.avgPrice || 100.0;
           }
@@ -485,7 +512,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
         };
 
         const flash = {};
-        Object.keys(newPrices).forEach(sym => {
+        Object.keys(newPrices).forEach((sym) => {
           const prev = prevPricesRef.current[sym]?.price;
           const curr = newPrices[sym]?.price;
           if (prev != null && curr != null && curr !== prev) {
@@ -512,20 +539,26 @@ export default function Dashboard({ user, onLogout, showToast }) {
     if (!portfolioAssets.length) return;
     setSparklineLoading(true);
     try {
-      const syms = [...new Set(portfolioAssets.map(a => {
-        const isCashAsset = a.type === "fiat" || a.category === "fiat";
-        if (isCashAsset) {
-          if (a.symbol === "USD") return null;
-          return getCurrencyTicker(a.symbol);
-        }
-        return a.symbol;
-      }).filter(Boolean))];
+      const syms = [
+        ...new Set(
+          portfolioAssets
+            .map((a) => {
+              const isCashAsset = a.type === "fiat" || a.category === "fiat";
+              if (isCashAsset) {
+                if (a.symbol === "USD") return null;
+                return getCurrencyTicker(a.symbol);
+              }
+              return a.symbol;
+            })
+            .filter(Boolean)
+        )
+      ];
 
       // Calculate optimal timeframe range based on earliest transaction date
       let earliestDate = null;
-      portfolioAssets.forEach(asset => {
+      portfolioAssets.forEach((asset) => {
         const assetLots = asset.lots && asset.lots.length > 0 ? asset.lots : [];
-        assetLots.forEach(lot => {
+        assetLots.forEach((lot) => {
           if (lot && lot.date && lot.date !== "1970-01-01") {
             if (!earliestDate || lot.date < earliestDate) {
               earliestDate = lot.date;
@@ -540,7 +573,15 @@ export default function Dashboard({ user, onLogout, showToast }) {
         const ageInDays = (Date.now() - earliestTime) / 86400000;
 
         const rangeDurationDays = {
-          "1D": 1, "1W": 7, "1M": 30, "3M": 90, "6M": 180, "YTD": 365, "1Y": 365, "5Y": 1825, "MAX": Infinity
+          "1D": 1,
+          "1W": 7,
+          "1M": 30,
+          "3M": 90,
+          "6M": 180,
+          YTD: 365,
+          "1Y": 365,
+          "5Y": 1825,
+          MAX: Infinity
         };
 
         const rangesOrder = ["1D", "1W", "1M", "3M", "6M", "YTD", "1Y", "5Y", "MAX"];
@@ -570,23 +611,42 @@ export default function Dashboard({ user, onLogout, showToast }) {
         setSparklines(data);
       } else {
         const mockSparklines = {};
-        const days = {
-          "1D": 24, "1W": 7, "1M": 30, "3M": 90, "6M": 180, "YTD": 150, "1Y": 252, "5Y": 252 * 5, "MAX": 252 * 5
-        }[optimalRange] || 30;
+        const days =
+          {
+            "1D": 24,
+            "1W": 7,
+            "1M": 30,
+            "3M": 90,
+            "6M": 180,
+            YTD: 150,
+            "1Y": 252,
+            "5Y": 252 * 5,
+            MAX: 252 * 5
+          }[optimalRange] || 30;
 
         const nowTime = Date.now();
-        const dateInterval = {
-          "1D": 3600 * 1000, "1W": 24 * 3600 * 1000, "1M": 24 * 3600 * 1000, "3M": 24 * 3600 * 1000,
-          "6M": 24 * 3600 * 1000, "YTD": 24 * 3600 * 1000, "1Y": 24 * 3600 * 1000, "5Y": 7 * 24 * 3600 * 1000, "MAX": 7 * 24 * 3600 * 1000
-        }[optimalRange] || 24 * 3600 * 1000;
+        const dateInterval =
+          {
+            "1D": 3600 * 1000,
+            "1W": 24 * 3600 * 1000,
+            "1M": 24 * 3600 * 1000,
+            "3M": 24 * 3600 * 1000,
+            "6M": 24 * 3600 * 1000,
+            YTD: 24 * 3600 * 1000,
+            "1Y": 24 * 3600 * 1000,
+            "5Y": 7 * 24 * 3600 * 1000,
+            MAX: 7 * 24 * 3600 * 1000
+          }[optimalRange] || 24 * 3600 * 1000;
 
-        syms.forEach(sym => {
+        syms.forEach((sym) => {
           const cleanSym = sym.toUpperCase();
           const dates = [];
           const closes = [];
 
           let basePrice = 100.0;
-          const matchAsset = portfolioAssets.find(a => a.symbol.toUpperCase() === cleanSym || getCurrencyTicker(a.symbol).toUpperCase() === cleanSym);
+          const matchAsset = portfolioAssets.find(
+            (a) => a.symbol.toUpperCase() === cleanSym || getCurrencyTicker(a.symbol).toUpperCase() === cleanSym
+          );
           if (matchAsset) {
             basePrice = matchAsset.avgCost || matchAsset.avgPrice || 100.0;
           }
@@ -639,13 +699,15 @@ export default function Dashboard({ user, onLogout, showToast }) {
     const isShortTF = chartRange === "1D" || chartRange === "5D" || chartRange === "1W";
 
     const symbolPriceHistories = {};
-    Object.keys(sparklines).forEach(sym => {
+    Object.keys(sparklines).forEach((sym) => {
       const symData = sparklines[sym];
       if (symData && symData.dates && symData.dates.length > 0) {
-        const points = symData.dates.map((d, idx) => ({
-          dateStr: isShortTF ? d : d.split("T")[0],
-          price: symData.closes[idx]
-        })).filter(p => p.price != null && p.price > 0);
+        const points = symData.dates
+          .map((d, idx) => ({
+            dateStr: isShortTF ? d : d.split("T")[0],
+            price: symData.closes[idx]
+          }))
+          .filter((p) => p.price != null && p.price > 0);
         points.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
         symbolPriceHistories[sym.toUpperCase()] = points;
       }
@@ -675,7 +737,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
         return livePrice;
       }
 
-      const asset = assets.find(a => a.symbol.toUpperCase() === sym.toUpperCase());
+      const asset = assets.find((a) => a.symbol.toUpperCase() === sym.toUpperCase());
       if (asset) {
         const avg = asset.avgCost ?? asset.avgPrice ?? 0;
         if (avg > 0) return avg;
@@ -684,10 +746,10 @@ export default function Dashboard({ user, onLogout, showToast }) {
     };
 
     const allDatesSet = new Set();
-    Object.keys(sparklines).forEach(sym => {
+    Object.keys(sparklines).forEach((sym) => {
       const symData = sparklines[sym];
       if (symData && symData.dates) {
-        symData.dates.forEach(d => {
+        symData.dates.forEach((d) => {
           if (d) {
             if (isShortTF) {
               allDatesSet.add(d);
@@ -713,9 +775,9 @@ export default function Dashboard({ user, onLogout, showToast }) {
     let timeline = Array.from(allDatesSet).sort((a, b) => a.localeCompare(b));
 
     let earliestDate = null;
-    assets.forEach(asset => {
+    assets.forEach((asset) => {
       const assetLots = asset.lots && asset.lots.length > 0 ? asset.lots : [];
-      assetLots.forEach(lot => {
+      assetLots.forEach((lot) => {
         if (lot && lot.date && lot.date !== "1970-01-01") {
           if (!earliestDate || lot.date < earliestDate) {
             earliestDate = lot.date;
@@ -725,7 +787,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
     });
 
     let rawStartDateStr = null;
-    Object.keys(sparklines).forEach(sym => {
+    Object.keys(sparklines).forEach((sym) => {
       const symData = sparklines[sym];
       if (symData && symData.dates && symData.dates.length > 0) {
         const firstDate = symData.dates[0];
@@ -741,7 +803,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
     if (earliestDate) {
       const earliestStr = earliestDate.split("T")[0];
       if (rawStartDateStr && earliestStr > rawStartDateStr) {
-        timeline = timeline.filter(d => {
+        timeline = timeline.filter((d) => {
           const dStr = isShortTF ? d.split("T")[0] : d;
           return dStr >= earliestStr;
         });
@@ -755,32 +817,43 @@ export default function Dashboard({ user, onLogout, showToast }) {
       }
     }
 
-    const assetLotsWithMappedIdx = assets.map(asset => {
+    const assetLotsWithMappedIdx = assets.map((asset) => {
       const isThai = asset.symbol.toUpperCase().endsWith(".BK");
       const isCashAsset = asset.type === "fiat" || asset.category === "fiat";
-      
-      const rawLots = asset.lots && asset.lots.length > 0
-        ? asset.lots
-        : [{ id: "virtual", date: "1970-01-01", time: "00:00", qty: asset.qty, price: (asset.avgCost ?? asset.avgPrice ?? 0) }];
-        
-      const mappedLots = rawLots.map(lot => {
-        if (!lot || !lot.date) return null;
-        const lotTime = new Date(lot.date + "T" + (lot.time || "00:00") + ":00.000Z").getTime();
-        
-        let bestIdx = 0;
-        let bestDiff = Infinity;
-        timeline.forEach((tStr, idx) => {
-          const tTime = new Date(tStr.includes("T") ? tStr : tStr + "T00:00:00.000Z").getTime();
-          const diff = Math.abs(tTime - lotTime);
-          if (diff < bestDiff) {
-            bestDiff = diff;
-            bestIdx = idx;
-          }
-        });
-        
-        return { ...lot, mappedIdx: bestIdx };
-      }).filter(Boolean);
-      
+
+      const rawLots =
+        asset.lots && asset.lots.length > 0
+          ? asset.lots
+          : [
+              {
+                id: "virtual",
+                date: "1970-01-01",
+                time: "00:00",
+                qty: asset.qty,
+                price: asset.avgCost ?? asset.avgPrice ?? 0
+              }
+            ];
+
+      const mappedLots = rawLots
+        .map((lot) => {
+          if (!lot || !lot.date) return null;
+          const lotTime = new Date(lot.date + "T" + (lot.time || "00:00") + ":00.000Z").getTime();
+
+          let bestIdx = 0;
+          let bestDiff = Infinity;
+          timeline.forEach((tStr, idx) => {
+            const tTime = new Date(tStr.includes("T") ? tStr : tStr + "T00:00:00.000Z").getTime();
+            const diff = Math.abs(tTime - lotTime);
+            if (diff < bestDiff) {
+              bestDiff = diff;
+              bestIdx = idx;
+            }
+          });
+
+          return { ...lot, mappedIdx: bestIdx };
+        })
+        .filter(Boolean);
+
       return {
         ...asset,
         lots: mappedLots,
@@ -793,14 +866,14 @@ export default function Dashboard({ user, onLogout, showToast }) {
       let totalUSD = 0;
       let totalCostUSD = 0;
 
-      assetLotsWithMappedIdx.forEach(asset => {
-        const lotsBeforeOrOnDate = asset.lots.filter(lot => lot.mappedIdx <= idx);
+      assetLotsWithMappedIdx.forEach((asset) => {
+        const lotsBeforeOrOnDate = asset.lots.filter((lot) => lot.mappedIdx <= idx);
         if (lotsBeforeOrOnDate.length === 0) return;
 
         const qtyOnDate = lotsBeforeOrOnDate.reduce((sum, l) => sum + (l.qty || 0), 0);
 
         const costOnDateUSD = lotsBeforeOrOnDate.reduce((sum, l) => {
-          let priceUSD = asset.isThai ? (l.price || 0) / exchangeRate : (l.price || 0);
+          let priceUSD = asset.isThai ? (l.price || 0) / exchangeRate : l.price || 0;
           if (asset.isCashAsset) {
             if (asset.symbol === "USD") {
               priceUSD = 1.0;
@@ -856,7 +929,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
       return { date: dateIso, value: totalUSD, cost: totalCostUSD };
     });
 
-    history = history.filter(d => d.value > 0);
+    history = history.filter((d) => d.value > 0);
 
     if (history.length === 1) {
       const singlePoint = history[0];
@@ -890,7 +963,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
       if (data) {
         const rates = {};
         if (data.candles) {
-          data.candles.forEach(c => {
+          data.candles.forEach((c) => {
             if (c.date && c.close) {
               const dateKey = c.date.split("T")[0];
               rates[dateKey] = c.close;
@@ -925,130 +998,190 @@ export default function Dashboard({ user, onLogout, showToast }) {
 
   /* ── SORT TABLE ── */
   const handleSort = (key) => {
-    setSortConfig(prev =>
-      prev.key === key
-        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
-        : { key, dir: "desc" }
+    setSortConfig((prev) =>
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }
     );
   };
 
   /* ── COMPUTE PER-ASSET VALUATION ── */
-  const computeAsset = useCallback((asset) => {
-    const isThai = asset.symbol.endsWith(".BK");
-    const isCashAsset = asset.type === "fiat" || asset.category === "fiat";
+  const computeAsset = useCallback(
+    (asset) => {
+      const isThai = asset.symbol.endsWith(".BK");
+      const isCashAsset = asset.type === "fiat" || asset.category === "fiat";
 
-    if (isCashAsset) {
-      const price = 1.0;
-      const priceUSD = getCurrencyPriceUSD(asset.symbol, prices, exchangeRate);
+      if (isCashAsset) {
+        const price = 1.0;
+        const priceUSD = getCurrencyPriceUSD(asset.symbol, prices, exchangeRate);
+        const valueUSD = priceUSD * asset.qty;
+        const valueTHB = valueUSD * exchangeRate;
+
+        const avgCost = asset.avgCost ?? asset.avgPrice ?? priceUSD;
+        const costUSD = avgCost * asset.qty;
+        const gainUSD = valueUSD - costUSD;
+        const gainPct = costUSD > 0 ? (gainUSD / costUSD) * 100 : 0;
+
+        let todayChg = 0;
+        let todayPct = 0;
+        if (asset.symbol !== "USD") {
+          const ticker = getCurrencyTicker(asset.symbol);
+          const pData = prices[ticker];
+          if (pData) {
+            const prevPriceVal = pData.previousClose || pData.price;
+            if (prevPriceVal > 0) {
+              let prevPriceUSD = 0;
+              if (["EUR", "GBP", "AUD", "NZD"].includes(asset.symbol)) {
+                prevPriceUSD = prevPriceVal;
+              } else {
+                prevPriceUSD = 1.0 / prevPriceVal;
+              }
+              todayChg = (priceUSD - prevPriceUSD) * asset.qty;
+              todayPct = prevPriceUSD > 0 ? ((priceUSD - prevPriceUSD) / prevPriceUSD) * 100 : 0;
+            }
+          }
+        }
+
+        return {
+          price,
+          priceUSD,
+          valueUSD,
+          valueTHB,
+          costUSD,
+          gainUSD,
+          gainPct,
+          todayChg,
+          todayPct,
+          extPrice: null,
+          extChangePct: null,
+          extType: null
+        };
+      }
+
+      const pData = prices[asset.symbol];
+      const regPrice = pData?.price ?? 0;
+
+      const isPre = pData?.marketState === "PRE" || pData?.marketState === "PREPRE";
+      const isPost = pData?.marketState === "POST" || pData?.marketState === "POSTPOST";
+
+      let extPrice = null;
+      let extChangePct = null;
+      let extType = null;
+
+      if (isPre && pData.prePrice != null && pData.prePrice > 0) {
+        extPrice = pData.prePrice;
+        extChangePct = regPrice > 0 ? ((pData.prePrice - regPrice) / regPrice) * 100 : 0;
+        extType = "Pre";
+      } else if (isPost && pData.postPrice != null && pData.postPrice > 0) {
+        extPrice = pData.postPrice;
+        extChangePct = regPrice > 0 ? ((pData.postPrice - regPrice) / regPrice) * 100 : 0;
+        extType = "After";
+      }
+
+      const price = extPrice ?? regPrice;
+      const priceUSD = isThai ? price / exchangeRate : price;
       const valueUSD = priceUSD * asset.qty;
       const valueTHB = valueUSD * exchangeRate;
 
-      const avgCost = asset.avgCost ?? asset.avgPrice ?? priceUSD;
+      const avgCost = asset.avgCost ?? asset.avgPrice ?? 0;
       const costUSD = avgCost * asset.qty;
       const gainUSD = valueUSD - costUSD;
       const gainPct = costUSD > 0 ? (gainUSD / costUSD) * 100 : 0;
 
-      let todayChg = 0;
-      let todayPct = 0;
-      if (asset.symbol !== "USD") {
-        const ticker = getCurrencyTicker(asset.symbol);
-        const pData = prices[ticker];
-        if (pData) {
-          const prevPriceVal = pData.previousClose || pData.price;
-          if (prevPriceVal > 0) {
-            let prevPriceUSD = 0;
-            if (["EUR", "GBP", "AUD", "NZD"].includes(asset.symbol)) {
-              prevPriceUSD = prevPriceVal;
-            } else {
-              prevPriceUSD = 1.0 / prevPriceVal;
-            }
-            todayChg = (priceUSD - prevPriceUSD) * asset.qty;
-            todayPct = prevPriceUSD > 0 ? ((priceUSD - prevPriceUSD) / prevPriceUSD) * 100 : 0;
-          }
-        }
+      const activePrice = price;
+      const prevClose = pData?.previousClose ?? activePrice;
+      const todayChg = (activePrice - prevClose) * asset.qty;
+      const todayPct = prevClose > 0 ? ((activePrice - prevClose) / prevClose) * 100 : 0;
+
+      const regPriceUSD = isThai ? regPrice / exchangeRate : regPrice;
+      const regValueUSD = regPriceUSD * asset.qty;
+      const regValueTHB = regValueUSD * exchangeRate;
+      const regGainUSD = regValueUSD - costUSD;
+      const regGainPct = costUSD > 0 ? (regGainUSD / costUSD) * 100 : 0;
+      const regTodayChg = pData?.change ? (isThai ? pData.change / exchangeRate : pData.change) * asset.qty : 0;
+      const regTodayPct = pData?.changePercent ?? 0;
+
+      let extPriceUSD = null,
+        extValueUSD = null,
+        extValueTHB = null,
+        extGainUSD = null,
+        extGainPct = null,
+        extTodayPct = null;
+
+      if (extPrice != null) {
+        extPriceUSD = isThai ? extPrice / exchangeRate : extPrice;
+        extValueUSD = extPriceUSD * asset.qty;
+        extValueTHB = extValueUSD * exchangeRate;
+        extGainUSD = extValueUSD - costUSD;
+        extGainPct = costUSD > 0 ? (extGainUSD / costUSD) * 100 : 0;
+        extTodayPct = extChangePct ?? 0;
       }
 
       return {
-        price, priceUSD, valueUSD, valueTHB, costUSD, gainUSD, gainPct, todayChg, todayPct,
-        extPrice: null, extChangePct: null, extType: null
+        price,
+        priceUSD,
+        valueUSD,
+        valueTHB,
+        costUSD,
+        gainUSD,
+        gainPct,
+        todayChg,
+        todayPct,
+        extPrice,
+        extChangePct,
+        extType,
+        regPrice,
+        regPriceUSD,
+        regValueUSD,
+        regValueTHB,
+        regGainUSD,
+        regGainPct,
+        regTodayChg,
+        regTodayPct,
+        extPriceUSD,
+        extValueUSD,
+        extValueTHB,
+        extGainUSD,
+        extGainPct,
+        extTodayPct
       };
-    }
-
-    const pData = prices[asset.symbol];
-    const regPrice = pData?.price ?? 0;
-
-    const isPre = pData?.marketState === "PRE" || pData?.marketState === "PREPRE";
-    const isPost = pData?.marketState === "POST" || pData?.marketState === "POSTPOST";
-
-    let extPrice = null;
-    let extChangePct = null;
-    let extType = null;
-
-    if (isPre && pData.prePrice != null && pData.prePrice > 0) {
-      extPrice = pData.prePrice;
-      extChangePct = regPrice > 0 ? ((pData.prePrice - regPrice) / regPrice) * 100 : 0;
-      extType = "Pre";
-    } else if (isPost && pData.postPrice != null && pData.postPrice > 0) {
-      extPrice = pData.postPrice;
-      extChangePct = regPrice > 0 ? ((pData.postPrice - regPrice) / regPrice) * 100 : 0;
-      extType = "After";
-    }
-
-    const price = extPrice ?? regPrice;
-    const priceUSD = isThai ? price / exchangeRate : price;
-    const valueUSD = priceUSD * asset.qty;
-    const valueTHB = valueUSD * exchangeRate;
-
-    const avgCost  = asset.avgCost ?? asset.avgPrice ?? 0;
-    const costUSD  = avgCost * asset.qty;
-    const gainUSD  = valueUSD - costUSD;
-    const gainPct  = costUSD > 0 ? (gainUSD / costUSD) * 100 : 0;
-
-    const activePrice = price;
-    const prevClose = pData?.previousClose ?? activePrice;
-    const todayChg = ((activePrice - prevClose) * asset.qty);
-    const todayPct = (prevClose > 0 ? ((activePrice - prevClose) / prevClose) * 100 : 0);
-
-    const regPriceUSD = isThai ? regPrice / exchangeRate : regPrice;
-    const regValueUSD = regPriceUSD * asset.qty;
-    const regValueTHB = regValueUSD * exchangeRate;
-    const regGainUSD  = regValueUSD - costUSD;
-    const regGainPct  = costUSD > 0 ? (regGainUSD / costUSD) * 100 : 0;
-    const regTodayChg = pData?.change ? (isThai ? pData.change / exchangeRate : pData.change) * asset.qty : 0;
-    const regTodayPct = pData?.changePercent ?? 0;
-
-    let extPriceUSD = null, extValueUSD = null, extValueTHB = null, extGainUSD = null, extGainPct = null, extTodayPct = null;
-
-    if (extPrice != null) {
-      extPriceUSD = isThai ? extPrice / exchangeRate : extPrice;
-      extValueUSD = extPriceUSD * asset.qty;
-      extValueTHB = extValueUSD * exchangeRate;
-      extGainUSD = extValueUSD - costUSD;
-      extGainPct = costUSD > 0 ? (extGainUSD / costUSD) * 100 : 0;
-      extTodayPct = extChangePct ?? 0;
-    }
-
-    return {
-      price, priceUSD, valueUSD, valueTHB, costUSD, gainUSD, gainPct, todayChg, todayPct,
-      extPrice, extChangePct, extType,
-      regPrice, regPriceUSD, regValueUSD, regValueTHB, regGainUSD, regGainPct, regTodayChg, regTodayPct,
-      extPriceUSD, extValueUSD, extValueTHB, extGainUSD, extGainPct, extTodayPct
-    };
-  }, [prices, exchangeRate]);
+    },
+    [prices, exchangeRate]
+  );
 
   /* ── COMPUTED PORTFOLIO TOTALS ── */
-  const { totalUSD, totalCostUSD, todayChangeUSD, totalRealizedUSD, totalRealizedTHB, bestAsset, sortedAssets, donutSegments } = useMemo(() => {
-    if (!assets.length) return { totalUSD: 0, totalCostUSD: 0, todayChangeUSD: 0, totalRealizedUSD: 0, totalRealizedTHB: 0, bestAsset: null, sortedAssets: [], donutSegments: [] };
+  const {
+    totalUSD,
+    totalCostUSD,
+    todayChangeUSD,
+    totalRealizedUSD,
+    totalRealizedTHB,
+    bestAsset,
+    sortedAssets,
+    donutSegments
+  } = useMemo(() => {
+    if (!assets.length)
+      return {
+        totalUSD: 0,
+        totalCostUSD: 0,
+        todayChangeUSD: 0,
+        totalRealizedUSD: 0,
+        totalRealizedTHB: 0,
+        bestAsset: null,
+        sortedAssets: [],
+        donutSegments: []
+      };
 
-    let totVal = 0, totCost = 0, totToday = 0;
+    let totVal = 0,
+      totCost = 0,
+      totToday = 0;
     let totRealized = 0;
     let totRealizedTHB = 0;
-    let bestSym = null, bestPct = -Infinity;
+    let bestSym = null,
+      bestPct = -Infinity;
 
-    const computed = assets.map(a => {
+    const computed = assets.map((a) => {
       const c = computeAsset(a);
-      totVal   += c.valueUSD;
-      totCost  += c.costUSD;
+      totVal += c.valueUSD;
+      totCost += c.costUSD;
       totToday += c.todayChg;
 
       const isThai = a.symbol.toUpperCase().endsWith(".BK");
@@ -1061,11 +1194,12 @@ export default function Dashboard({ user, onLogout, showToast }) {
       totRealizedTHB += realizedTHB;
 
       const assetWithPnL = {
-        ...a, ...c,
+        ...a,
+        ...c,
         realizedPnL: realized,
         realizedPnLTHB: realizedTHB,
-        unrealizedPnL: a.qty > 0 ? (c.valueUSD - c.costUSD) : 0,
-        totalPnL: realized + (a.qty > 0 ? (c.valueUSD - c.costUSD) : 0)
+        unrealizedPnL: a.qty > 0 ? c.valueUSD - c.costUSD : 0,
+        totalPnL: realized + (a.qty > 0 ? c.valueUSD - c.costUSD : 0)
       };
 
       if (c.gainPct > bestPct && a.qty > 0 && (a.avgCost > 0 || a.avgPrice > 0)) {
@@ -1075,29 +1209,39 @@ export default function Dashboard({ user, onLogout, showToast }) {
       return assetWithPnL;
     });
 
-    const activeAssets = computed.filter(a => a.qty > 0.00001);
+    const activeAssets = computed.filter((a) => a.qty > 0.00001);
 
     const sorted = [...activeAssets].sort((a, b) => {
       if (!sortConfig.key) return b.valueUSD - a.valueUSD;
       const dir = sortConfig.dir === "asc" ? 1 : -1;
       switch (sortConfig.key) {
-        case "value"  : return dir * (a.valueUSD - b.valueUSD);
-        case "gain"   : return dir * (a.gainPct - b.gainPct);
-        case "today"  : return dir * (a.todayPct - b.todayPct);
-        case "symbol" : return dir * a.symbol.localeCompare(b.symbol);
-        default       : return 0;
+        case "value":
+          return dir * (a.valueUSD - b.valueUSD);
+        case "gain":
+          return dir * (a.gainPct - b.gainPct);
+        case "today":
+          return dir * (a.todayPct - b.todayPct);
+        case "symbol":
+          return dir * a.symbol.localeCompare(b.symbol);
+        default:
+          return 0;
       }
     });
 
     const catMap = {};
-    activeAssets.forEach(a => {
+    activeAssets.forEach((a) => {
       const cat = a.category || "stock";
       if (!catMap[cat]) catMap[cat] = 0;
       catMap[cat] += a.valueUSD;
     });
     const donut = Object.entries(catMap)
-      .map(([cat, val]) => ({ id: cat, label: CATEGORY_LABELS[cat] || cat, pct: totVal > 0 ? (val / totVal) * 100 : 0, value: val }))
-      .filter(s => s.pct > 0)
+      .map(([cat, val]) => ({
+        id: cat,
+        label: CATEGORY_LABELS[cat] || cat,
+        pct: totVal > 0 ? (val / totVal) * 100 : 0,
+        value: val
+      }))
+      .filter((s) => s.pct > 0)
       .sort((a, b) => b.pct - a.pct);
 
     return {
@@ -1108,18 +1252,18 @@ export default function Dashboard({ user, onLogout, showToast }) {
       totalRealizedTHB: totRealizedTHB,
       bestAsset: bestSym ? { symbol: bestSym.symbol, pct: bestPct } : null,
       sortedAssets: sorted,
-      donutSegments: donut,
+      donutSegments: donut
     };
   }, [assets, prices, exchangeRate, sortConfig, computeAsset, getRealizedPnLInTHB]);
 
   const initialCapitalUSD = useMemo(() => {
     let sumBuys = 0;
     let hasBuys = false;
-    assets.forEach(a => {
+    assets.forEach((a) => {
       const isCashAsset = a.type === "fiat" || a.category === "fiat";
       if (!isCashAsset) {
         const isThai = a.symbol.toUpperCase().endsWith(".BK");
-        (a.lots || []).forEach(l => {
+        (a.lots || []).forEach((l) => {
           if (l.qty > 0) {
             const priceUSD = isThai ? l.price / exchangeRate : l.price;
             sumBuys += l.qty * priceUSD;
@@ -1163,18 +1307,18 @@ export default function Dashboard({ user, onLogout, showToast }) {
       const getTodayLocalDate = () => {
         const d = new Date();
         const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
         return `${year}-${month}-${day}`;
       };
 
       for (const tx of sortedTx) {
-        const sym      = (tx.symbol || "").trim().toUpperCase();
-        const name     = (tx.name   || sym).trim();
-        const newQty   = parseFloat(tx.qty);
+        const sym = (tx.symbol || "").trim().toUpperCase();
+        const name = (tx.name || sym).trim();
+        const newQty = parseFloat(tx.qty);
         const newPrice = parseFloat(tx.avgPrice ?? tx.price ?? 0);
         const category = tx.type ?? tx.category ?? "stock";
-        const broker   = (tx.broker || "").trim();
+        const broker = (tx.broker || "").trim();
 
         let buyDate = tx.date ? tx.date.trim() : "";
         if (!buyDate) {
@@ -1204,9 +1348,8 @@ export default function Dashboard({ user, onLogout, showToast }) {
         const isSell = tx.transactionType === "SELL";
         const displaySym = broker ? `${sym} (${broker})` : sym;
 
-        const existingIdx = updatedAssets.findIndex(a =>
-          a.symbol === sym &&
-          (a.broker || "").trim().toLowerCase() === broker.toLowerCase()
+        const existingIdx = updatedAssets.findIndex(
+          (a) => a.symbol === sym && (a.broker || "").trim().toLowerCase() === broker.toLowerCase()
         );
 
         if (isSell) {
@@ -1222,10 +1365,16 @@ export default function Dashboard({ user, onLogout, showToast }) {
             const existing = updatedAssets[existingIdx];
             if (newQty > existing.qty) {
               if (!isBatch) {
-                showToast(`❌ ขาย ${displaySym} ไม่ได้ — จำนวนที่ขาย (${fmtQty(newQty, hideValues)}) มากกว่าที่ถืออยู่ (${fmtQty(existing.qty, hideValues)} หน่วย)`, "error");
+                showToast(
+                  `❌ ขาย ${displaySym} ไม่ได้ — จำนวนที่ขาย (${fmtQty(newQty, hideValues)}) มากกว่าที่ถืออยู่ (${fmtQty(existing.qty, hideValues)} หน่วย)`,
+                  "error"
+                );
                 return;
               } else {
-                skippedTxs.push({ tx: { symbol: sym, ...tx }, reason: `จำนวนหุ้นไม่เพียงพอ (ขาย ${fmtQty(newQty, hideValues)} แต่ในพอร์ตมี ${fmtQty(existing.qty, hideValues)})` });
+                skippedTxs.push({
+                  tx: { symbol: sym, ...tx },
+                  reason: `จำนวนหุ้นไม่เพียงพอ (ขาย ${fmtQty(newQty, hideValues)} แต่ในพอร์ตมี ${fmtQty(existing.qty, hideValues)})`
+                });
                 continue;
               }
             }
@@ -1234,7 +1383,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
 
         if (existingIdx >= 0) {
           const existingAsset = updatedAssets[existingIdx];
-          const duplicateLot = (existingAsset.lots || []).find(l => {
+          const duplicateLot = (existingAsset.lots || []).find((l) => {
             const sameDate = l.date === buyDate;
             const sameTime = (l.time || "") === buyTime;
             const sameQty = Math.abs(l.qty - (isSell ? -newQty : newQty)) < 0.00001;
@@ -1254,30 +1403,30 @@ export default function Dashboard({ user, onLogout, showToast }) {
         }
 
         const newLot = {
-          id:     `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          date:   buyDate,
-          time:   buyTime,
-          qty:    isSell ? -newQty : newQty,
-          price:  newPrice,
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          date: buyDate,
+          time: buyTime,
+          qty: isSell ? -newQty : newQty,
+          price: newPrice,
           broker: broker
         };
 
         if (existingIdx >= 0) {
-          const existing  = updatedAssets[existingIdx];
-          const oldLots   = existing.lots || [];
-          const allLots   = [...oldLots, newLot];
-          const totalQty  = allLots.reduce((s, l) => s + l.qty, 0);
+          const existing = updatedAssets[existingIdx];
+          const oldLots = existing.lots || [];
+          const allLots = [...oldLots, newLot];
+          const totalQty = allLots.reduce((s, l) => s + l.qty, 0);
 
-          const buyLots = allLots.filter(l => l.qty > 0);
-          const buyQty  = buyLots.reduce((s, l) => s + l.qty, 0);
+          const buyLots = allLots.filter((l) => l.qty > 0);
+          const buyQty = buyLots.reduce((s, l) => s + l.qty, 0);
           const buyCost = buyLots.reduce((s, l) => s + l.qty * l.price, 0);
           const avgCost = buyQty > 0 ? buyCost / buyQty : 0;
 
           updatedAssets[existingIdx] = {
             ...existing,
-            lots:    allLots,
-            qty:     totalQty,
-            avgCost: avgCost,
+            lots: allLots,
+            qty: totalQty,
+            avgCost: avgCost
           };
 
           if (!isBatch) {
@@ -1291,14 +1440,14 @@ export default function Dashboard({ user, onLogout, showToast }) {
           }
         } else {
           updatedAssets.push({
-            id:       `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            symbol:   sym,
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            symbol: sym,
             name,
             category,
             broker,
-            lots:     [newLot],
-            qty:      isSell ? -newQty : newQty,
-            avgCost:  newPrice,
+            lots: [newLot],
+            qty: isSell ? -newQty : newQty,
+            avgCost: newPrice
           });
           if (!isBatch) {
             const isCash = category === "fiat";
@@ -1317,8 +1466,15 @@ export default function Dashboard({ user, onLogout, showToast }) {
       if (isBatch) {
         if (skippedTxs.length > 0) {
           const successCount = sortedTx.length - skippedTxs.length;
-          const errorDetails = skippedTxs.map(s => `- ${s.tx.symbol} (${s.tx.transactionType === "BUY" ? "ซื้อ" : "ขาย"} · ${s.tx.qty} หน่วย): ${s.reason}`).join("\n");
-          alert(`⚠️ นำเข้าธุรกรรมสำเร็จ ${successCount}/${sortedTx.length} รายการ\n\nรายการที่ถูกข้ามเนื่องจากข้อผิดพลาด:\n${errorDetails}`);
+          const errorDetails = skippedTxs
+            .map(
+              (s) =>
+                `- ${s.tx.symbol} (${s.tx.transactionType === "BUY" ? "ซื้อ" : "ขาย"} · ${s.tx.qty} หน่วย): ${s.reason}`
+            )
+            .join("\n");
+          alert(
+            `⚠️ นำเข้าธุรกรรมสำเร็จ ${successCount}/${sortedTx.length} รายการ\n\nรายการที่ถูกข้ามเนื่องจากข้อผิดพลาด:\n${errorDetails}`
+          );
         } else {
           showToast(`✅ นำเข้าธุรกรรมทั้งหมด ${sortedTx.length} รายการสำเร็จ!`, "success");
         }
@@ -1330,7 +1486,10 @@ export default function Dashboard({ user, onLogout, showToast }) {
 
   /* ── CLEAR PORTFOLIO ── */
   const handleClearPortfolio = async () => {
-    if (!confirm("⚠️ คุณต้องการล้างข้อมูลหุ้นและธุรกรรมทั้งหมดในพอร์ตใช่หรือไม่? (ชื่อเล่นและรูปโปรไฟล์ของคุณจะไม่ถูกลบ)")) return;
+    if (
+      !confirm("⚠️ คุณต้องการล้างข้อมูลหุ้นและธุรกรรมทั้งหมดในพอร์ตใช่หรือไม่? (ชื่อเล่นและรูปโปรไฟล์ของคุณจะไม่ถูกลบ)")
+    )
+      return;
     try {
       await savePortfolio([]);
       showToast("🗑️ ล้างข้อมูลพอร์ตหุ้นเรียบร้อยแล้ว!", "success");
@@ -1342,7 +1501,12 @@ export default function Dashboard({ user, onLogout, showToast }) {
 
   /* ── CLEAR ALL DATA ── */
   const handleClearAllData = async () => {
-    if (!confirm("⚠️ คำเตือน: คุณต้องการล้างข้อมูลทุกอย่างทั้งหมด (ทั้งข้อมูลหุ้น, ชื่อเล่น, และรูปโปรไฟล์) กลับเป็นค่าเริ่มต้นใช่หรือไม่?")) return;
+    if (
+      !confirm(
+        "⚠️ คำเตือน: คุณต้องการล้างข้อมูลทุกอย่างทั้งหมด (ทั้งข้อมูลหุ้น, ชื่อเล่น, และรูปโปรไฟล์) กลับเป็นค่าเริ่มต้นใช่หรือไม่?"
+      )
+    )
+      return;
     try {
       await savePortfolio([]);
 
@@ -1364,7 +1528,9 @@ export default function Dashboard({ user, onLogout, showToast }) {
 
   /* ── EXPORT / IMPORT ── */
   const handleExport = () => {
-    const blob = new Blob([JSON.stringify({ assets, exportedAt: new Date().toISOString() }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ assets, exportedAt: new Date().toISOString() }, null, 2)], {
+      type: "application/json"
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -1382,12 +1548,17 @@ export default function Dashboard({ user, onLogout, showToast }) {
       try {
         const parsed = JSON.parse(ev.target.result);
         const imported = parsed.assets || parsed;
-        if (!Array.isArray(imported)) { showToast("ไฟล์ไม่ถูกต้อง", "error"); return; }
+        if (!Array.isArray(imported)) {
+          showToast("ไฟล์ไม่ถูกต้อง", "error");
+          return;
+        }
         await savePortfolio(imported);
         showToast(`✅ นำเข้า ${imported.length} รายการสำเร็จ`, "success");
         fetchPrices(imported);
         fetchSparklines(imported, chartRange);
-      } catch { showToast("ไฟล์ไม่ถูกต้อง", "error"); }
+      } catch {
+        showToast("ไฟล์ไม่ถูกต้อง", "error");
+      }
     };
     reader.readAsText(file);
     e.target.value = "";
@@ -1455,7 +1626,15 @@ export default function Dashboard({ user, onLogout, showToast }) {
               />
 
               <div className="card stagger-3">
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, minHeight: 28 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 12,
+                    minHeight: 28
+                  }}
+                >
                   <div className="card-section-title">
                     <PieChart size={16} /> สัดส่วนสินทรัพย์
                   </div>
@@ -1536,7 +1715,10 @@ export default function Dashboard({ user, onLogout, showToast }) {
         <AssetModal
           isOpen={modalOpen}
           editingAsset={editingAsset}
-          onClose={() => { setModalOpen(false); setEditingAsset(null); }}
+          onClose={() => {
+            setModalOpen(false);
+            setEditingAsset(null);
+          }}
           onSave={handleSaveAsset}
           exchangeRate={exchangeRate}
           showToast={showToast}
@@ -1567,7 +1749,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
         <AssetDetailPanel
           asset={selectedAsset}
           price={
-            (selectedAsset.type === "fiat" || selectedAsset.category === "fiat")
+            selectedAsset.type === "fiat" || selectedAsset.category === "fiat"
               ? prices[getCurrencyTicker(selectedAsset.symbol)]
               : prices[selectedAsset.symbol]
           }
@@ -1579,7 +1761,12 @@ export default function Dashboard({ user, onLogout, showToast }) {
       )}
 
       {profileModalOpen && (
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setProfileModalOpen(false); }}>
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setProfileModalOpen(false);
+          }}
+        >
           <div className="modal-content" style={{ maxWidth: 440 }}>
             <div className="modal-header">
               <span className="modal-title">⚙️ ตั้งค่าระบบ (Settings)</span>
@@ -1590,16 +1777,27 @@ export default function Dashboard({ user, onLogout, showToast }) {
 
             <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* SECTION 1: PROFILE INFO */}
-              <div style={{
-                background: "#FFFFFF",
-                border: "1px solid var(--border)",
-                borderRadius: "16px",
-                padding: "16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 16
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text-main)", borderBottom: "1.5px solid var(--primary-light)", paddingBottom: 6, display: "block" }}>
+              <div
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid var(--border)",
+                  borderRadius: "16px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "var(--text-main)",
+                    borderBottom: "1.5px solid var(--primary-light)",
+                    paddingBottom: 6,
+                    display: "block"
+                  }}
+                >
                   👤 ข้อมูลส่วนตัว (Profile Info)
                 </span>
 
@@ -1611,7 +1809,10 @@ export default function Dashboard({ user, onLogout, showToast }) {
                     onMouseLeave={() => setAvatarHovered(false)}
                   >
                     <img
-                      src={profilePic || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 80 80'><rect width='80' height='80' fill='%23F1F5F9'/><text x='50%' y='55%' font-family='sans-serif' font-size='32' text-anchor='middle' fill='%2394A3B8'>👤</text></svg>"}
+                      src={
+                        profilePic ||
+                        "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 80 80'><rect width='80' height='80' fill='%23F1F5F9'/><text x='50%' y='55%' font-family='sans-serif' font-size='32' text-anchor='middle' fill='%2394A3B8'>👤</text></svg>"
+                      }
                       alt="profile avatar"
                       style={{
                         width: 90,
@@ -1775,15 +1976,12 @@ export default function Dashboard({ user, onLogout, showToast }) {
                       title="เปลี่ยนรูปโปรไฟล์"
                     >
                       <Plus size={16} />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: "none" }}
-                        onChange={handleAvatarUpload}
-                      />
+                      <input type="file" accept="image/*" style={{ display: "none" }} onChange={handleAvatarUpload} />
                     </label>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 500, color: "var(--text-muted)", textAlign: "center" }}>รองรับไฟล์รูปภาพ JPG, PNG, WebP (ไม่เกิน 10MB)</span>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: "var(--text-muted)", textAlign: "center" }}>
+                    รองรับไฟล์รูปภาพ JPG, PNG, WebP (ไม่เกิน 10MB)
+                  </span>
                 </div>
 
                 {/* Nickname Input */}
@@ -1808,16 +2006,27 @@ export default function Dashboard({ user, onLogout, showToast }) {
               </div>
 
               {/* SECTION 2: CHANGE PASSWORD */}
-              <div style={{
-                background: "#FFFFFF",
-                border: "1px solid var(--border)",
-                borderRadius: "16px",
-                padding: "16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 16
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text-main)", borderBottom: "1.5px solid var(--loss-light)", paddingBottom: 6, display: "block" }}>
+              <div
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid var(--border)",
+                  borderRadius: "16px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "var(--text-main)",
+                    borderBottom: "1.5px solid var(--loss-light)",
+                    paddingBottom: 6,
+                    display: "block"
+                  }}
+                >
                   🔑 เปลี่ยนรหัสผ่านใหม่ (Change Password)
                 </span>
 
@@ -1847,30 +2056,64 @@ export default function Dashboard({ user, onLogout, showToast }) {
                 <button
                   className="btn ripple-btn"
                   onClick={handleChangePassword}
-                  style={{ height: 44, fontSize: 13, background: "var(--loss)", color: "white", boxShadow: "0 4px 12px var(--loss-glow)", border: "none" }}
+                  style={{
+                    height: 44,
+                    fontSize: 13,
+                    background: "var(--loss)",
+                    color: "white",
+                    boxShadow: "0 4px 12px var(--loss-glow)",
+                    border: "none"
+                  }}
                 >
                   ยืนยันเปลี่ยนรหัสผ่าน
                 </button>
               </div>
 
               {/* SECTION 3: BACKUP & RESTORE */}
-              <div style={{
-                background: "#FFFFFF",
-                border: "1px solid var(--border)",
-                borderRadius: "16px",
-                padding: "16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 16
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text-main)", borderBottom: "1.5px solid var(--primary-light)", paddingBottom: 6, display: "block" }}>
+              <div
+                style={{
+                  background: "#FFFFFF",
+                  border: "1px solid var(--border)",
+                  borderRadius: "16px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "var(--text-main)",
+                    borderBottom: "1.5px solid var(--primary-light)",
+                    paddingBottom: 6,
+                    display: "block"
+                  }}
+                >
                   💾 สำรองข้อมูล (Backup & Restore)
                 </span>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn btn-secondary ripple-btn" style={{ height: 44, fontSize: 13, flex: 1 }} onClick={handleExport}>
+                  <button
+                    className="btn btn-secondary ripple-btn"
+                    style={{ height: 44, fontSize: 13, flex: 1 }}
+                    onClick={handleExport}
+                  >
                     <Download size={15} /> ส่งออก JSON
                   </button>
-                  <label className="btn btn-secondary ripple-btn" style={{ height: 44, fontSize: 13, flex: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                  <label
+                    className="btn btn-secondary ripple-btn"
+                    style={{
+                      height: 44,
+                      fontSize: 13,
+                      flex: 1,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 4
+                    }}
+                  >
                     <Upload size={15} /> นำเข้า JSON
                     <input type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
                   </label>
@@ -1878,16 +2121,27 @@ export default function Dashboard({ user, onLogout, showToast }) {
               </div>
 
               {/* SECTION 5: DATA MANAGEMENT */}
-              <div style={{
-                background: "#FFF5F5",
-                border: "1px solid #FEE2E2",
-                borderRadius: "16px",
-                padding: "16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#EF4444", borderBottom: "1.5px solid #FCA5A5", paddingBottom: 6, display: "block" }}>
+              <div
+                style={{
+                  background: "#FFF5F5",
+                  border: "1px solid #FEE2E2",
+                  borderRadius: "16px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "#EF4444",
+                    borderBottom: "1.5px solid #FCA5A5",
+                    paddingBottom: 6,
+                    display: "block"
+                  }}
+                >
                   ⚠️ การจัดการข้อมูล (Data Management)
                 </span>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1936,16 +2190,27 @@ export default function Dashboard({ user, onLogout, showToast }) {
               </div>
 
               {/* SECTION 6: USER ACCOUNT & LOGOUT */}
-              <div style={{
-                background: "#FFF5F5",
-                border: "1px solid #FEE2E2",
-                borderRadius: "16px",
-                padding: "16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12
-              }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#EF4444", borderBottom: "1.5px solid #FCA5A5", paddingBottom: 6, display: "block" }}>
+              <div
+                style={{
+                  background: "#FFF5F5",
+                  border: "1px solid #FEE2E2",
+                  borderRadius: "16px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "#EF4444",
+                    borderBottom: "1.5px solid #FCA5A5",
+                    paddingBottom: 6,
+                    display: "block"
+                  }}
+                >
                   🚪 บัญชีผู้ใช้งาน (User Account)
                 </span>
                 <button
@@ -1970,7 +2235,6 @@ export default function Dashboard({ user, onLogout, showToast }) {
                   <LogOut size={16} /> ออกจากระบบ (Logout)
                 </button>
               </div>
-
             </div>
 
             {/* Close modal */}
@@ -2104,7 +2368,9 @@ export default function Dashboard({ user, onLogout, showToast }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header" style={{ borderBottom: "none", padding: 0 }}>
-              <span className="modal-title" style={{ fontSize: 16, fontWeight: 800 }}>🎨 เลือกรูปประจำตัว (Presets)</span>
+              <span className="modal-title" style={{ fontSize: 16, fontWeight: 800 }}>
+                🎨 เลือกรูปประจำตัว (Presets)
+              </span>
               <button
                 type="button"
                 className="btn-close"
@@ -2124,13 +2390,15 @@ export default function Dashboard({ user, onLogout, showToast }) {
               </button>
             </div>
 
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 16,
-              justifyItems: "center",
-              padding: "8px 0"
-            }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 16,
+                justifyItems: "center",
+                padding: "8px 0"
+              }}
+            >
               {PRESET_AVATARS.map((preset) => {
                 const isSelected = profilePic === preset.svg;
                 return (

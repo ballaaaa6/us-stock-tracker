@@ -1,0 +1,9 @@
+node_modules/
+dist/
+scratch/
+.wrangler/
+package-lock.json
+*.traineddata
+sqlite_data/
+supabase/
+.git/

@@ -15,7 +15,7 @@ export async function onRequestPost(context) {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Content-Type": "application/json",
+    "Content-Type": "application/json"
   };
 
   try {
@@ -37,7 +37,10 @@ export async function onRequestPost(context) {
     }
 
     // Very explicit prompt — forces specific field extraction + ISO date
-    const buildPrompt = (idx, total) => `Image ${idx + 1} of ${total}. This is a stock trading receipt from Dime! app (Thai broker).
+    const buildPrompt = (
+      idx,
+      total
+    ) => `Image ${idx + 1} of ${total}. This is a stock trading receipt from Dime! app (Thai broker).
 
 INSTRUCTIONS — read the image carefully and fill in these exact fields:
 
@@ -92,7 +95,7 @@ Output ONLY valid JSON, nothing else:
         const aiResponse = await env.AI.run("@cf/llava-hf/llava-1.5-7b-hf", {
           prompt,
           image: [...bytes],
-          max_tokens: 300,
+          max_tokens: 300
         });
 
         const rawText = aiResponse?.description || aiResponse?.response || "";
@@ -100,10 +103,16 @@ Output ONLY valid JSON, nothing else:
 
         // Try to extract JSON from response
         let data = null;
-        const clean = rawText.trim().replace(/^```[\w]*\n?/, "").replace(/\n?```$/, "").trim();
+        const clean = rawText
+          .trim()
+          .replace(/^```[\w]*\n?/, "")
+          .replace(/\n?```$/, "")
+          .trim();
         const jsonMatch = clean.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          try { data = JSON.parse(jsonMatch[0]); } catch {}
+          try {
+            data = JSON.parse(jsonMatch[0]);
+          } catch {}
         }
 
         if (!data) throw new Error(`Could not parse AI response: ${clean.slice(0, 100)}`);
@@ -144,16 +153,14 @@ Output ONLY valid JSON, nothing else:
           qty,
           price,
           date,
-          time: data.time || "",
+          time: data.time || ""
         });
-
       } catch (err) {
         errors.push({ index: i, error: err.message });
       }
     }
 
     return new Response(JSON.stringify({ results, errors }), { status: 200, headers: corsHeaders });
-
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
   }
@@ -165,7 +172,7 @@ export async function onRequestOptions() {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    },
+      "Access-Control-Allow-Headers": "Content-Type, Authorization"
+    }
   });
 }

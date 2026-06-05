@@ -60,19 +60,10 @@ export default function App() {
       )}
 
       {currentPage === "register" && (
-        <Register
-          onNavigateToLogin={() => setCurrentPage("login")}
-          showToast={showToast}
-        />
+        <Register onNavigateToLogin={() => setCurrentPage("login")} showToast={showToast} />
       )}
 
-      {currentPage === "dashboard" && user && (
-        <Dashboard
-          user={user}
-          onLogout={handleLogout}
-          showToast={showToast}
-        />
-      )}
+      {currentPage === "dashboard" && user && <Dashboard user={user} onLogout={handleLogout} showToast={showToast} />}
 
       {/* 3. Global Floating Toast Notification Banner */}
       {toast.show && (

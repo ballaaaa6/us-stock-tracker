@@ -12,7 +12,10 @@ export default function DonutChart({ segments, activeAssets, hasAssets, drillCat
     setHoveredSlice(null);
   }, [drillCategory]);
 
-  const R = 68, CX = 80, CY = 80, SW = 18;
+  const R = 68,
+    CX = 80,
+    CY = 80,
+    SW = 18;
   const circumference = 2 * Math.PI * R;
 
   // Handle mouse move to update tooltip position
@@ -43,15 +46,13 @@ export default function DonutChart({ segments, activeAssets, hasAssets, drillCat
               <div className="donut-center-count" style={{ color: "var(--text-faint)" }}>
                 {activeAssets?.length > 0 ? activeAssets.length : "—"}
               </div>
-              <div className="donut-center-text">
-                {activeAssets?.length > 0 ? "กำลังโหลด..." : "ว่างเปล่า"}
-              </div>
+              <div className="donut-center-text">{activeAssets?.length > 0 ? "กำลังโหลด..." : "ว่างเปล่า"}</div>
             </div>
           </div>
           <div className="legend-list">
             {hasAssets ? (
               /* Skeleton rows when assets exist but no prices yet */
-              [1, 2, 3, 4].map(i => (
+              [1, 2, 3, 4].map((i) => (
                 <div key={i} className="legend-item">
                   <div className="skeleton skeleton-circle" style={{ width: 10, height: 10, flexShrink: 0 }} />
                   <div className="skeleton skeleton-text" style={{ flex: 1, height: 12 }} />
@@ -60,7 +61,15 @@ export default function DonutChart({ segments, activeAssets, hasAssets, drillCat
               ))
             ) : (
               /* Empty state hint */
-              <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "12px 0", fontSize: 12, color: "var(--text-faint)" }}>
+              <div
+                style={{
+                  gridColumn: "1/-1",
+                  textAlign: "center",
+                  padding: "12px 0",
+                  fontSize: 12,
+                  color: "var(--text-faint)"
+                }}
+              >
                 เพิ่มสินทรัพย์เพื่อดูสัดส่วน
               </div>
             )}
@@ -95,7 +104,7 @@ export default function DonutChart({ segments, activeAssets, hasAssets, drillCat
     });
   } else {
     // Drilled-down View
-    const filtered = activeAssets.filter(a => (a.category || "stock") === drillCategory);
+    const filtered = activeAssets.filter((a) => (a.category || "stock") === drillCategory);
     const catTotalVal = filtered.reduce((sum, a) => sum + (a.valueUSD || 0), 0);
     const sortedFiltered = [...filtered].sort((a, b) => (b.valueUSD || 0) - (a.valueUSD || 0));
 
@@ -126,11 +135,7 @@ export default function DonutChart({ segments, activeAssets, hasAssets, drillCat
   return (
     <div className="donut-card-body" style={{ position: "relative" }}>
       <div className="chart-container">
-        <div
-          className="donut-wrapper"
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => setHoveredSlice(null)}
-        >
+        <div className="donut-wrapper" onMouseMove={handleMouseMove} onMouseLeave={() => setHoveredSlice(null)}>
           <svg viewBox="0 0 160 160" className="donut-chart-svg">
             {/* Background track */}
             <circle cx={CX} cy={CY} r={R} fill="none" stroke="#F1F5F9" strokeWidth={SW} />
@@ -138,7 +143,9 @@ export default function DonutChart({ segments, activeAssets, hasAssets, drillCat
             {slices.map((s, i) => (
               <circle
                 key={i}
-                cx={CX} cy={CY} r={R}
+                cx={CX}
+                cy={CY}
+                r={R}
                 fill="none"
                 stroke={s.color}
                 strokeWidth={hoveredSlice && hoveredSlice.id === s.id ? SW + 3 : SW}
@@ -154,7 +161,8 @@ export default function DonutChart({ segments, activeAssets, hasAssets, drillCat
                 }}
                 style={{
                   cursor: !drillCategory ? "pointer" : "default",
-                  transition: "stroke-width 0.2s ease, stroke-dasharray 0.8s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)"
+                  transition:
+                    "stroke-width 0.2s ease, stroke-dasharray 0.8s cubic-bezier(0.4,0,0.2,1), stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)"
                 }}
               />
             ))}
@@ -203,7 +211,11 @@ export default function DonutChart({ segments, activeAssets, hasAssets, drillCat
                 <div style={{ display: "flex", gap: 12, justifyContent: "space-between", fontSize: 11 }}>
                   <span style={{ color: "var(--text-faint)" }}>มูลค่า:</span>
                   <span style={{ fontWeight: 800, color: "white" }}>
-                    ${hoveredSlice.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    $
+                    {hoveredSlice.value.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
                   </span>
                 </div>
               )}
@@ -231,8 +243,15 @@ export default function DonutChart({ segments, activeAssets, hasAssets, drillCat
               }}
             >
               <div className="legend-color" style={{ background: s.color }} />
-              <span className="legend-name" style={{ fontWeight: hoveredSlice && hoveredSlice.id === s.id ? 800 : 600 }}>{s.label}</span>
-              <span className="legend-pct" style={{ color: s.color, fontWeight: 800 }}>{s.pct.toFixed(2)}%</span>
+              <span
+                className="legend-name"
+                style={{ fontWeight: hoveredSlice && hoveredSlice.id === s.id ? 800 : 600 }}
+              >
+                {s.label}
+              </span>
+              <span className="legend-pct" style={{ color: s.color, fontWeight: 800 }}>
+                {s.pct.toFixed(2)}%
+              </span>
             </div>
           ))}
         </div>

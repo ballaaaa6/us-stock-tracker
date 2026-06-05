@@ -187,27 +187,37 @@ const getCurrencyTicker = (symbol) => {
 };
 
 /* ─── Formatters ─── */
-const fmtDate  = (s) => s ? new Date(s + "T00:00:00").toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" }) : "—";
-const fmtUSD   = (n) => n == null ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: n < 1 ? 4 : 2 }).format(n);
-const fmtQty   = (n) => n == null ? "—" : new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 6 }).format(n);
+const fmtDate = (s) =>
+  s ? new Date(s + "T00:00:00").toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" }) : "—";
+const fmtUSD = (n) =>
+  n == null
+    ? "—"
+    : new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: n < 1 ? 4 : 2
+      }).format(n);
+const fmtQty = (n) =>
+  n == null ? "—" : new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 6 }).format(n);
 
 export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exchangeRate, showToast }) {
-  const [type,        setType]        = useState("stock");
-  const [symbol,      setSymbol]      = useState("");
-  const [name,        setName]        = useState("");
-  const [qty,         setQty]         = useState("");
-  const [price,       setPrice]       = useState("");
-  const [date,        setDate]        = useState(() => new Date().toISOString().split("T")[0]);
-  const [time,        setTime]        = useState("");
-  const [broker,      setBroker]      = useState("");
-  const [txType,      setTxType]      = useState("BUY"); // BUY or SELL
+  const [type, setType] = useState("stock");
+  const [symbol, setSymbol] = useState("");
+  const [name, setName] = useState("");
+  const [qty, setQty] = useState("");
+  const [price, setPrice] = useState("");
+  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [time, setTime] = useState("");
+  const [broker, setBroker] = useState("");
+  const [txType, setTxType] = useState("BUY"); // BUY or SELL
 
   /* Search state */
-  const [query,       setQuery]       = useState("");
+  const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
-  const [searching,   setSearching]   = useState(false);
-  const [showDrop,    setShowDrop]    = useState(false);
-  const [confirmed,   setConfirmed]   = useState(false); // true when symbol picked
+  const [searching, setSearching] = useState(false);
+  const [showDrop, setShowDrop] = useState(false);
+  const [confirmed, setConfirmed] = useState(false); // true when symbol picked
 
   /* History panel */
   const [showHistory, setShowHistory] = useState(false);
@@ -220,8 +230,8 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
   const [currencyRate, setCurrencyRate] = useState(1.0);
   const [currencyRateLoading, setCurrencyRateLoading] = useState(false);
 
-  const debounceRef  = useRef(null);
-  const qtyInputRef  = useRef(null);
+  const debounceRef = useRef(null);
+  const qtyInputRef = useRef(null);
   const fileInputRef = useRef(null);
   const [scanning, setScanning] = useState(false);
   const [scannedQueue, setScannedQueue] = useState([]);
@@ -236,34 +246,45 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
   };
 
   /* ─── Image compressor: shrink to max 1024px & 75% JPEG ─── */
-  const compressImage = (file) => new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const MAX = 1024;
-      let { width, height } = img;
-      if (width > MAX || height > MAX) {
-        if (width > height) { height = Math.round(height * MAX / width); width = MAX; }
-        else { width = Math.round(width * MAX / height); height = MAX; }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width; canvas.height = height;
-      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-      canvas.toBlob((blob) => {
+  const compressImage = (file) =>
+    new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const MAX = 1024;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) {
+            height = Math.round((height * MAX) / width);
+            width = MAX;
+          } else {
+            width = Math.round((width * MAX) / height);
+            height = MAX;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve({ base64: reader.result.split(",")[1], mime: "image/jpeg" });
+            reader.readAsDataURL(blob);
+          },
+          "image/jpeg",
+          0.75
+        );
+      };
+      img.onerror = () => {
+        // Fallback: use original file uncompressed
         const reader = new FileReader();
-        reader.onload = () => resolve({ base64: reader.result.split(",")[1], mime: "image/jpeg" });
-        reader.readAsDataURL(blob);
-      }, "image/jpeg", 0.75);
-    };
-    img.onerror = () => {
-      // Fallback: use original file uncompressed
-      const reader = new FileReader();
-      reader.onload = () => resolve({ base64: reader.result.split(",")[1], mime: file.type || "image/jpeg" });
-      reader.readAsDataURL(file);
-    };
-    img.src = url;
-  });
+        reader.onload = () => resolve({ base64: reader.result.split(",")[1], mime: file.type || "image/jpeg" });
+        reader.readAsDataURL(file);
+      };
+      img.src = url;
+    });
 
   const processReceiptImages = async (files) => {
     if (!files || files.length === 0) return;
@@ -277,7 +298,7 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
     // ══════════════════════════════════════════════════════════════════════
     // Step 1: Compress all images to base64
     // ══════════════════════════════════════════════════════════════════════
-    setScanningStatus(prev => ({ ...prev, stage: "📦 กำลังบีบอัดรูปภาพ..." }));
+    setScanningStatus((prev) => ({ ...prev, stage: "📦 กำลังบีบอัดรูปภาพ..." }));
     const imagesToProcess = [];
     for (let idx = 0; idx < fileList.length; idx++) {
       try {
@@ -302,7 +323,7 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
 
     for (const img of imagesToProcess) {
       const idx = img.index;
-      setScanningStatus(prev => ({
+      setScanningStatus((prev) => ({
         ...prev,
         stage: `🤖 กำลังสแกนรูปที่ ${completedImages + 1}/${imagesToProcess.length}...`
       }));
@@ -320,21 +341,30 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
           const resObj = data.results[0];
           // Debug: แสดงข้อมูลดิบจาก AI เพื่อตรวจสอบว่า AI ส่งอะไรกลับมา
           console.log(`🤖 [Scan Debug] Image ${idx + 1} — AI Raw:`, resObj.raw_ai);
-          console.log(`🤖 [Scan Debug] Image ${idx + 1} — Validated:`, { action: resObj.action, symbol: resObj.symbol, price: resObj.actual_price, shares: resObj.share_amount, timestamp: resObj.timestamp });
+          console.log(`🤖 [Scan Debug] Image ${idx + 1} — Validated:`, {
+            action: resObj.action,
+            symbol: resObj.symbol,
+            price: resObj.actual_price,
+            shares: resObj.share_amount,
+            timestamp: resObj.timestamp
+          });
           const ts = resObj.timestamp || "";
           const date = ts ? ts.split("T")[0] : new Date().toISOString().split("T")[0];
           const time = ts && ts.includes("T") ? ts.split("T")[1].slice(0, 5) : "";
 
-          const validated = validateParsedReceipt({
-            symbol:          resObj.symbol,
-            name:            resObj.symbol,
-            category:        "stock",
-            qty:             resObj.share_amount,
-            price:           resObj.actual_price,
-            date,
-            time,
-            transactionType: resObj.action
-          }, idx);
+          const validated = validateParsedReceipt(
+            {
+              symbol: resObj.symbol,
+              name: resObj.symbol,
+              category: "stock",
+              qty: resObj.share_amount,
+              price: resObj.actual_price,
+              date,
+              time,
+              transactionType: resObj.action
+            },
+            idx
+          );
 
           if (validated) {
             // Auto-map symbol from Yahoo Finance to get full suffix (e.g. PTT -> PTT.BK)
@@ -343,9 +373,10 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                 const suggestions = await api.prices.checkPrice(validated.symbol);
                 if (suggestions) {
                   if (suggestions && suggestions.length > 0) {
-                    const matched = suggestions.find(s => 
-                      s.symbol.toUpperCase() === validated.symbol.toUpperCase() ||
-                      s.symbol.toUpperCase().startsWith(validated.symbol.toUpperCase() + ".")
+                    const matched = suggestions.find(
+                      (s) =>
+                        s.symbol.toUpperCase() === validated.symbol.toUpperCase() ||
+                        s.symbol.toUpperCase().startsWith(validated.symbol.toUpperCase() + ".")
                     );
                     if (matched) {
                       validated.symbol = matched.symbol;
@@ -360,14 +391,14 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
 
             newScannedItems.push({
               id: `${Date.now()}-workers-ai-${idx}`,
-              symbol:          validated.symbol,
-              name:            validated.name,
-              type:            validated.category,
-              qty:             String(validated.qty),
-              avgPrice:        String(validated.price),
-              date:            validated.date,
-              time:            validated.time,
-              broker:          "Dime!",
+              symbol: validated.symbol,
+              name: validated.name,
+              type: validated.category,
+              qty: String(validated.qty),
+              avgPrice: String(validated.price),
+              date: validated.date,
+              time: validated.time,
+              broker: "Dime!",
               transactionType: validated.transactionType
             });
             delete fileErrors[idx];
@@ -383,13 +414,13 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
       }
 
       completedImages++;
-      setScanningStatus(prev => ({
+      setScanningStatus((prev) => ({
         ...prev,
         completed: Math.min(fileList.length, completedImages)
       }));
     }
 
-    setScanningStatus(prev => ({ ...prev, completed: fileList.length }));
+    setScanningStatus((prev) => ({ ...prev, completed: fileList.length }));
 
     // ══════════════════════════════════════════════════════════════════════
     // Step 5: Deliver results
@@ -414,9 +445,12 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
         setBroker(item.broker || "Dime!");
         setTxType(item.transactionType);
         setConfirmed(true);
-        triggerToast(`🤖 สแกนใบเสร็จสำเร็จ!\nดึงข้อมูล: ${item.symbol} (${item.transactionType === "BUY" ? "ซื้อ/ฝาก" : "ขาย/ถอน"} · ${item.qty} หน่วย @ $${item.avgPrice})`, "success");
+        triggerToast(
+          `🤖 สแกนใบเสร็จสำเร็จ!\nดึงข้อมูล: ${item.symbol} (${item.transactionType === "BUY" ? "ซื้อ/ฝาก" : "ขาย/ถอน"} · ${item.qty} หน่วย @ $${item.avgPrice})`,
+          "success"
+        );
       } else {
-        setScannedQueue(prev => {
+        setScannedQueue((prev) => {
           const combined = [...prev, ...newScannedItems];
           combined.sort((a, b) => {
             const dtA = `${a.date || ""}T${a.time || "00:00"}`;
@@ -431,13 +465,15 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
 
     const errors = Object.values(fileErrors);
     if (errors.length > 0) {
-      triggerToast(`⚠️ สแกนเสร็จ (พบข้อผิดพลาด ${errors.length} รายการ):\n${errors.slice(0, 3).join("\n")}${errors.length > 3 ? `\n...และอีก ${errors.length - 3} รายการ` : ""}`, "warning");
+      triggerToast(
+        `⚠️ สแกนเสร็จ (พบข้อผิดพลาด ${errors.length} รายการ):\n${errors.slice(0, 3).join("\n")}${errors.length > 3 ? `\n...และอีก ${errors.length - 3} รายการ` : ""}`,
+        "warning"
+      );
     }
 
     setScanning(false);
     setScanningStatus({ active: false, total: 0, completed: 0 });
   };
-
 
   const handleDropReceipt = (e) => {
     e.preventDefault();
@@ -452,21 +488,15 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
 
   const filteredCurrencies = useMemo(() => {
     const q = currencyQuery.trim().toLowerCase();
-    const pinned = CURRENCIES.filter(c => c.code === "THB" || c.code === "USD");
-    const others = CURRENCIES.filter(c => c.code !== "THB" && c.code !== "USD");
+    const pinned = CURRENCIES.filter((c) => c.code === "THB" || c.code === "USD");
+    const others = CURRENCIES.filter((c) => c.code !== "THB" && c.code !== "USD");
 
     if (!q) {
       return [...pinned, ...others];
     }
 
-    const filteredPinned = pinned.filter(c =>
-      c.code.toLowerCase().includes(q) ||
-      c.name.toLowerCase().includes(q)
-    );
-    const filteredOthers = others.filter(c =>
-      c.code.toLowerCase().includes(q) ||
-      c.name.toLowerCase().includes(q)
-    );
+    const filteredPinned = pinned.filter((c) => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
+    const filteredOthers = others.filter((c) => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
 
     return [...filteredPinned, ...filteredOthers];
   }, [currencyQuery]);
@@ -481,7 +511,7 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
       setSymbol(editingAsset.symbol || "");
       setName(editingAsset.name || "");
       setQuery(editingAsset.symbol || "");
-      setCurrencyQuery(cat === "fiat" ? (editingAsset.symbol || "") : "");
+      setCurrencyQuery(cat === "fiat" ? editingAsset.symbol || "" : "");
       setQty("");
       setPrice("");
       setDate(new Date().toISOString().split("T")[0]);
@@ -525,8 +555,9 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
 
     setCurrencyRateLoading(true);
     const ticker = getCurrencyTicker(symbol);
-    api.prices.getForSymbols(ticker)
-      .then(data => {
+    api.prices
+      .getForSymbols(ticker)
+      .then((data) => {
         const q = data.quotes?.[ticker];
         if (q && q.price > 0) {
           if (["EUR", "GBP", "AUD", "NZD"].includes(symbol)) {
@@ -536,7 +567,7 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
           }
         }
       })
-      .catch(err => console.error("Error fetching currency rate:", err))
+      .catch((err) => console.error("Error fetching currency rate:", err))
       .finally(() => setCurrencyRateLoading(false));
   }, [symbol, type, exchangeRate]);
 
@@ -559,8 +590,11 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
           setSuggestions(data.slice(0, 7));
           setShowDrop(data.length > 0);
         }
-      } catch { /* ignore */ }
-      finally { setSearching(false); }
+      } catch {
+        /* ignore */
+      } finally {
+        setSearching(false);
+      }
     }, 400);
 
     return () => clearTimeout(debounceRef.current);
@@ -623,23 +657,32 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
   /* ─── Submit ─── */
   const handleSubmit = (e) => {
     e.preventDefault();
-    const pQty   = parseFloat(qty);
-    if (!symbol.trim())            { triggerToast("เลือกสินทรัพย์ก่อนนะครับ", "error"); return; }
-    if (isNaN(pQty) || pQty <= 0) { triggerToast("ใส่จำนวนให้ถูกต้อง (มากกว่า 0)", "error"); return; }
+    const pQty = parseFloat(qty);
+    if (!symbol.trim()) {
+      triggerToast("เลือกสินทรัพย์ก่อนนะครับ", "error");
+      return;
+    }
+    if (isNaN(pQty) || pQty <= 0) {
+      triggerToast("ใส่จำนวนให้ถูกต้อง (มากกว่า 0)", "error");
+      return;
+    }
 
     let pPrice = 1.0;
     if (type === "fiat") {
       pPrice = currencyRate;
     } else {
       pPrice = parseFloat(price);
-      if (isNaN(pPrice) || pPrice < 0) { triggerToast("ใส่ราคาทุนให้ถูกต้อง", "error"); return; }
+      if (isNaN(pPrice) || pPrice < 0) {
+        triggerToast("ใส่ราคาทุนให้ถูกต้อง", "error");
+        return;
+      }
     }
 
     const getTodayLocalDate = () => {
       const d = new Date();
       const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     };
 
@@ -654,14 +697,14 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
 
     onSave({
       symbol: symbol.trim().toUpperCase(),
-      name:   name.trim() || symbol.trim().toUpperCase(),
+      name: name.trim() || symbol.trim().toUpperCase(),
       type,
-      qty:      pQty,
+      qty: pQty,
       avgPrice: pPrice,
-      date:     finalDate,
-      time:     finalTime,
-      broker:   broker.trim(),
-      transactionType: txType,
+      date: finalDate,
+      time: finalTime,
+      broker: broker.trim(),
+      transactionType: txType
     });
   };
 
@@ -673,8 +716,8 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
     const getTodayLocalDate = () => {
       const d = new Date();
       const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     };
 
@@ -724,41 +767,52 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
   const lots = editingAsset?.lots || [];
 
   return (
-    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      className="modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="modal-content" style={{ maxWidth: 500 }}>
-
         {/* Header */}
         <div className="modal-header">
           <h2 className="modal-title">
             {editingAsset
-              ? (txType === "SELL"
-                  ? (type === "fiat" ? `📤 ถอนเงินสด ${editingAsset.symbol}` : `🔴 ขายสินทรัพย์ ${editingAsset.symbol}`)
-                  : (type === "fiat" ? `📥 ฝากเงินสด ${editingAsset.symbol}` : `🟢 ซื้อสินทรัพย์ ${editingAsset.symbol}`)
-                )
-              : (scannedQueue.length > 0 ? `📋 ตรวจสอบคิวสแกน (${scannedQueue.length} รายการ)` : "เพิ่มสินทรัพย์ใหม่")}
+              ? txType === "SELL"
+                ? type === "fiat"
+                  ? `📤 ถอนเงินสด ${editingAsset.symbol}`
+                  : `🔴 ขายสินทรัพย์ ${editingAsset.symbol}`
+                : type === "fiat"
+                  ? `📥 ฝากเงินสด ${editingAsset.symbol}`
+                  : `🟢 ซื้อสินทรัพย์ ${editingAsset.symbol}`
+              : scannedQueue.length > 0
+                ? `📋 ตรวจสอบคิวสแกน (${scannedQueue.length} รายการ)`
+                : "เพิ่มสินทรัพย์ใหม่"}
           </h2>
-          <button onClick={onClose} className="btn-close"><X size={18} /></button>
+          <button onClick={onClose} className="btn-close">
+            <X size={18} />
+          </button>
         </div>
 
         <form onSubmit={scannedQueue.length > 0 ? handleBatchSubmit : handleSubmit}>
           <div className="modal-body">
-
             {/* ── Receipt Scan Zone ── */}
-            <div style={{
-              background: "linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)",
-              border: "2px dashed var(--primary)",
-              borderRadius: "16px",
-              padding: "16px",
-              textAlign: "center",
-              marginBottom: 16,
-              cursor: "pointer",
-              position: "relative",
-              transition: "all 0.2s ease"
-            }}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDropReceipt}
-            onClick={() => fileInputRef.current?.click()}
-            className="receipt-dropzone"
+            <div
+              style={{
+                background: "linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)",
+                border: "2px dashed var(--primary)",
+                borderRadius: "16px",
+                padding: "16px",
+                textAlign: "center",
+                marginBottom: 16,
+                cursor: "pointer",
+                position: "relative",
+                transition: "all 0.2s ease"
+              }}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDropReceipt}
+              onClick={() => fileInputRef.current?.click()}
+              className="receipt-dropzone"
             >
               <input
                 type="file"
@@ -770,8 +824,17 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
               />
               {scanning ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                  <div className="spinner" style={{ width: 24, height: 24, borderColor: "var(--primary) transparent var(--primary) transparent" }} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--primary)", animation: "pulse 1.5s infinite" }}>
+                  <div
+                    className="spinner"
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderColor: "var(--primary) transparent var(--primary) transparent"
+                    }}
+                  />
+                  <span
+                    style={{ fontSize: 13, fontWeight: 700, color: "var(--primary)", animation: "pulse 1.5s infinite" }}
+                  >
                     {scanningStatus.active
                       ? `🤖 AI กำลังวิเคราะห์ใบเสร็จ (${scanningStatus.completed}/${scanningStatus.total})...`
                       : "🤖 AI กำลังวิเคราะห์รูปภาพ..."}
@@ -780,56 +843,83 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 22 }}>📸</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text-main)" }}>อัปโหลดรูปภาพใบเสร็จเพื่อกรอกออโต้</span>
-                  <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>รองรับหลายรูปภาพพร้อมกัน · ลากและวางหรือเลือกไฟล์</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "var(--text-main)" }}>
+                    อัปโหลดรูปภาพใบเสร็จเพื่อกรอกออโต้
+                  </span>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
+                    รองรับหลายรูปภาพพร้อมกัน · ลากและวางหรือเลือกไฟล์
+                  </span>
                 </div>
               )}
             </div>
 
             {scannedQueue.length > 0 ? (
               <>
-                <div style={{
-                  background: "#F8FAFC",
-                  border: "1px solid var(--border)",
-                  borderRadius: "16px",
-                  padding: "16px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                  maxHeight: "380px",
-                  overflowY: "auto"
-                }}>
+                <div
+                  style={{
+                    background: "#F8FAFC",
+                    border: "1px solid var(--border)",
+                    borderRadius: "16px",
+                    padding: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                    maxHeight: "380px",
+                    overflowY: "auto"
+                  }}
+                >
                   {scannedQueue.map((item, idx) => (
-                    <div key={item.id} style={{
-                      background: "#FFFFFF",
-                      border: "1px solid var(--border)",
-                      borderRadius: "12px",
-                      padding: "12px",
-                      position: "relative",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10
-                    }}>
-                      <button type="button" onClick={() => {
-                        setScannedQueue(prev => prev.filter(q => q.id !== item.id));
-                      }} style={{
-                        position: "absolute",
-                        top: 10,
-                        right: 10,
-                        border: "none",
-                        background: "transparent",
-                        color: "var(--loss)",
-                        cursor: "pointer"
-                      }}>
+                    <div
+                      key={item.id}
+                      style={{
+                        background: "#FFFFFF",
+                        border: "1px solid var(--border)",
+                        borderRadius: "12px",
+                        padding: "12px",
+                        position: "relative",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScannedQueue((prev) => prev.filter((q) => q.id !== item.id));
+                        }}
+                        style={{
+                          position: "absolute",
+                          top: 10,
+                          right: 10,
+                          border: "none",
+                          background: "transparent",
+                          color: "var(--loss)",
+                          cursor: "pointer"
+                        }}
+                      >
                         <Trash2 size={16} />
                       </button>
 
                       {/* Header Row: Symbol & Category & TxType */}
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, paddingRight: 24 }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>Ticker/สัญลักษณ์</label>
-                          <input type="text" className="form-input" style={{ height: 32, padding: "0 8px", fontSize: 12, textTransform: "uppercase" }}
-                            value={item.symbol} onChange={e => {
+                          <label
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "var(--text-muted)",
+                              display: "block",
+                              marginBottom: 3
+                            }}
+                          >
+                            Ticker/สัญลักษณ์
+                          </label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ height: 32, padding: "0 8px", fontSize: 12, textTransform: "uppercase" }}
+                            value={item.symbol}
+                            onChange={(e) => {
                               const updated = [...scannedQueue];
                               updated[idx].symbol = e.target.value.toUpperCase();
                               updated[idx].name = e.target.value.toUpperCase();
@@ -838,9 +928,22 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                           />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>ประเภทสินทรัพย์</label>
-                          <select className="form-input" style={{ height: 32, padding: "0 4px", fontSize: 12, background: "transparent" }}
-                            value={item.type} onChange={e => {
+                          <label
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "var(--text-muted)",
+                              display: "block",
+                              marginBottom: 3
+                            }}
+                          >
+                            ประเภทสินทรัพย์
+                          </label>
+                          <select
+                            className="form-input"
+                            style={{ height: 32, padding: "0 4px", fontSize: 12, background: "transparent" }}
+                            value={item.type}
+                            onChange={(e) => {
                               const updated = [...scannedQueue];
                               updated[idx].type = e.target.value;
                               setScannedQueue(updated);
@@ -853,18 +956,32 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                           </select>
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>ประเภทรายการ</label>
-                          <select className="form-input" style={{
-                            height: 32,
-                            padding: "0 4px",
-                            fontSize: 12,
-                            color: item.transactionType === "BUY" ? "var(--gain)" : "var(--loss)",
-                            backgroundColor: item.transactionType === "BUY" ? "var(--gain-light)" : "var(--loss-light)",
-                            borderColor: item.transactionType === "BUY" ? "var(--gain)" : "var(--loss)",
-                            fontWeight: "800",
-                            borderRadius: "8px"
-                          }}
-                            value={item.transactionType} onChange={e => {
+                          <label
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "var(--text-muted)",
+                              display: "block",
+                              marginBottom: 3
+                            }}
+                          >
+                            ประเภทรายการ
+                          </label>
+                          <select
+                            className="form-input"
+                            style={{
+                              height: 32,
+                              padding: "0 4px",
+                              fontSize: 12,
+                              color: item.transactionType === "BUY" ? "var(--gain)" : "var(--loss)",
+                              backgroundColor:
+                                item.transactionType === "BUY" ? "var(--gain-light)" : "var(--loss-light)",
+                              borderColor: item.transactionType === "BUY" ? "var(--gain)" : "var(--loss)",
+                              fontWeight: "800",
+                              borderRadius: "8px"
+                            }}
+                            value={item.transactionType}
+                            onChange={(e) => {
                               const updated = [...scannedQueue];
                               updated[idx].transactionType = e.target.value;
                               setScannedQueue(updated);
@@ -879,9 +996,24 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                       {/* Body Row: Qty & Price & Date & Time & Broker */}
                       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1.4fr 0.9fr 1.2fr", gap: 8 }}>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>จำนวน</label>
-                          <input type="number" step="any" className="form-input" style={{ height: 32, padding: "0 8px", fontSize: 12 }}
-                            value={item.qty} onChange={e => {
+                          <label
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "var(--text-muted)",
+                              display: "block",
+                              marginBottom: 3
+                            }}
+                          >
+                            จำนวน
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            className="form-input"
+                            style={{ height: 32, padding: "0 8px", fontSize: 12 }}
+                            value={item.qty}
+                            onChange={(e) => {
                               const updated = [...scannedQueue];
                               updated[idx].qty = e.target.value;
                               setScannedQueue(updated);
@@ -889,10 +1021,25 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                           />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>{item.type === "fiat" ? "เรทแลกเปลี่ยน" : "ราคาทุนต่อหน่วย"}</label>
-                          <input type="number" step="any" className="form-input" style={{ height: 32, padding: "0 8px", fontSize: 12 }}
+                          <label
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "var(--text-muted)",
+                              display: "block",
+                              marginBottom: 3
+                            }}
+                          >
+                            {item.type === "fiat" ? "เรทแลกเปลี่ยน" : "ราคาทุนต่อหน่วย"}
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            className="form-input"
+                            style={{ height: 32, padding: "0 8px", fontSize: 12 }}
                             disabled={item.type === "fiat" && item.symbol === "THB"}
-                            value={item.avgPrice} onChange={e => {
+                            value={item.avgPrice}
+                            onChange={(e) => {
                               const updated = [...scannedQueue];
                               updated[idx].avgPrice = e.target.value;
                               setScannedQueue(updated);
@@ -900,9 +1047,23 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                           />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>วันที่สั่งซื้อ</label>
-                          <input type="date" className="form-input" style={{ height: 32, padding: "0 4px", fontSize: 12 }}
-                            value={item.date} onChange={e => {
+                          <label
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "var(--text-muted)",
+                              display: "block",
+                              marginBottom: 3
+                            }}
+                          >
+                            วันที่สั่งซื้อ
+                          </label>
+                          <input
+                            type="date"
+                            className="form-input"
+                            style={{ height: 32, padding: "0 4px", fontSize: 12 }}
+                            value={item.date}
+                            onChange={(e) => {
                               const updated = [...scannedQueue];
                               updated[idx].date = e.target.value;
                               setScannedQueue(updated);
@@ -910,9 +1071,23 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                           />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>เวลา</label>
-                          <input type="time" className="form-input" style={{ height: 32, padding: "0 4px", fontSize: 12 }}
-                            value={item.time || ""} onChange={e => {
+                          <label
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "var(--text-muted)",
+                              display: "block",
+                              marginBottom: 3
+                            }}
+                          >
+                            เวลา
+                          </label>
+                          <input
+                            type="time"
+                            className="form-input"
+                            style={{ height: 32, padding: "0 4px", fontSize: 12 }}
+                            value={item.time || ""}
+                            onChange={(e) => {
                               const updated = [...scannedQueue];
                               updated[idx].time = e.target.value;
                               setScannedQueue(updated);
@@ -920,11 +1095,23 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                           />
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", display: "block", marginBottom: 3 }}>
+                          <label
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "var(--text-muted)",
+                              display: "block",
+                              marginBottom: 3
+                            }}
+                          >
                             {item.type === "fiat" ? "ธนาคาร" : "โบรกเกอร์"}
                           </label>
-                          <input type="text" className="form-input" style={{ height: 32, padding: "0 8px", fontSize: 12 }}
-                            value={item.broker || ""} onChange={e => {
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ height: 32, padding: "0 8px", fontSize: 12 }}
+                            value={item.broker || ""}
+                            onChange={(e) => {
                               const updated = [...scannedQueue];
                               updated[idx].broker = e.target.value;
                               setScannedQueue(updated);
@@ -937,21 +1124,24 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                 </div>
 
                 {/* Small drag & drop for more files */}
-                <div style={{
-                  background: "linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)",
-                  border: "1px dashed var(--primary)",
-                  borderRadius: "12px",
-                  padding: "10px",
-                  textAlign: "center",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  marginTop: 12
-                }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleDropReceipt}
-                onClick={() => fileInputRef.current?.click()}
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)",
+                    border: "1px dashed var(--primary)",
+                    borderRadius: "12px",
+                    padding: "10px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    marginTop: 12
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDropReceipt}
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)" }}>➕ อัปโหลดรูปภาพใบเสร็จเพิ่ม...</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--primary)" }}>
+                    ➕ อัปโหลดรูปภาพใบเสร็จเพิ่ม...
+                  </span>
                 </div>
               </>
             ) : (
@@ -962,14 +1152,17 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                     <label className="form-label">ประเภทสินทรัพย์</label>
                     <div className="category-selector">
                       {[
-                        { key: "stock",  emoji: "🇺🇸", label: "หุ้น" },
-                        { key: "gold",   emoji: "🥇/🛢️", label: "ทองคำ/น้ำมัน" },
+                        { key: "stock", emoji: "🇺🇸", label: "หุ้น" },
+                        { key: "gold", emoji: "🥇/🛢️", label: "ทองคำ/น้ำมัน" },
                         { key: "crypto", emoji: "🪙", label: "คริปโต" },
-                        { key: "fiat",   emoji: "💵", label: "เงินสด" },
-                      ].map(c => (
-                        <button key={c.key} type="button"
+                        { key: "fiat", emoji: "💵", label: "เงินสด" }
+                      ].map((c) => (
+                        <button
+                          key={c.key}
+                          type="button"
                           className={`category-btn${type === c.key ? " active" : ""} ripple-btn`}
-                          onClick={() => pickCategory(c.key)}>
+                          onClick={() => pickCategory(c.key)}
+                        >
                           <span className="category-emoji">{c.emoji}</span>
                           <span>{c.label}</span>
                         </button>
@@ -981,14 +1174,16 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                 {type === "gold" && !editingAsset && (
                   <div className="form-group" style={{ marginBottom: 16 }}>
                     <label className="form-label">เลือกประเภทโภคภัณฑ์</label>
-                    <div style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      background: "#F1F5F9",
-                      padding: 4,
-                      borderRadius: 12,
-                      gap: 4
-                    }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        background: "#F1F5F9",
+                        padding: 4,
+                        borderRadius: 12,
+                        gap: 4
+                      }}
+                    >
                       <button
                         type="button"
                         onClick={() => {
@@ -1037,443 +1232,682 @@ export default function AssetModal({ isOpen, onClose, onSave, editingAsset, exch
                   </div>
                 )}
 
-            {/* ── Symbol search OR confirmed chip ── */}
-            {type === "fiat" ? (
-              <div className="form-group" style={{ position: "relative" }}>
-                <label className="form-label">สกุลเงินสด</label>
-                <div style={{ position: "relative" }}>
-                  <Search size={17} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#94A3B8", pointerEvents: "none" }} />
-                  <input
-                    type="text"
-                    className="form-input"
-                    style={{ paddingLeft: 44 }}
-                    placeholder="พิมพ์รหัสหรือชื่อสกุลเงิน เช่น THB, USD, JPY, EUR..."
-                    value={currencyQuery}
-                    onChange={(e) => {
-                      setCurrencyQuery(e.target.value);
-                      setShowCurrencyDrop(true);
-                    }}
-                    onFocus={() => setShowCurrencyDrop(true)}
-                    onBlur={() => {
-                      // Delay so onMouseDown on suggestion fires first
-                      setTimeout(() => setShowCurrencyDrop(false), 200);
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        if (filteredCurrencies.length > 0) {
-                          const c = filteredCurrencies[0];
-                          setSymbol(c.code);
-                          setName(c.name);
-                          setCurrencyQuery(c.code);
-                          setShowCurrencyDrop(false);
-                          setConfirmed(true);
-                        }
-                      }
-                    }}
-                    disabled={editingAsset}
-                  />
-                </div>
-
-                {/* Selected currency indicator */}
-                {symbol && (
-                  <div style={{
-                    marginTop: 8,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: "var(--primary)",
-                    background: "var(--primary-light)",
-                    padding: "6px 12px",
-                    borderRadius: 10,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6
-                  }}>
-                    💵 เลือกแล้ว: <strong>{symbol}</strong> - {name}
-                  </div>
-                )}
-
-                {/* Dropdown list */}
-                {showCurrencyDrop && (
-                  <div className="suggestions-dropdown" style={{ maxHeight: 220, overflowY: "auto", zIndex: 1000 }}>
-                    {filteredCurrencies.length === 0 ? (
-                      <div style={{ padding: "10px 14px", fontSize: 13, color: "var(--text-muted)", textAlign: "center" }}>
-                        ไม่พบสกุลเงินที่ค้นหา
-                      </div>
-                    ) : (
-                      filteredCurrencies.map(c => (
-                        <div
-                          key={c.code}
-                          className="suggestion-item"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            setSymbol(c.code);
-                            setName(c.name);
-                            setCurrencyQuery(c.code);
-                            setShowCurrencyDrop(false);
-                            setConfirmed(true);
-                          }}
-                          style={{
-                            padding: "10px 14px",
-                            cursor: "pointer",
-                            background: symbol === c.code ? "var(--primary-light)" : "transparent",
-                            fontWeight: symbol === c.code ? 700 : 500
-                          }}
-                        >
-                          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                            <span style={{ color: symbol === c.code ? "var(--primary)" : "var(--text-main)" }}><strong>{c.code}</strong></span>
-                            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{c.name}</span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="form-group">
-                <label className="form-label">
-                  {!editingAsset ? (
-                    type === "stock"  ? "ค้นหาหุ้น (ชื่อย่อหรือชื่อบริษัท)" :
-                    type === "crypto" ? "ค้นหาเหรียญ (เช่น Bitcoin, SOL)" :
-                    "ทองคำตลาดโลก"
-                  ) : "สินทรัพย์"}
-                </label>
-
-                {/* Confirmed chip */}
-                {confirmed || editingAsset ? (
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    background: "var(--primary-light)", border: "1.5px solid var(--primary)",
-                    borderRadius: 16, padding: "10px 14px"
-                  }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 800, color: "var(--primary)", fontSize: 15 }}>{getDisplaySymbol(symbol)}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{name}</div>
-                    </div>
-                    {!editingAsset && (
-                      <button type="button" className="btn-close" onClick={clearSymbol}
-                        style={{ background: "rgba(82,54,255,0.1)", color: "var(--primary)" }}>
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  /* Search input + dropdown */
-                  <div style={{ position: "relative" }}>
+                {/* ── Symbol search OR confirmed chip ── */}
+                {type === "fiat" ? (
+                  <div className="form-group" style={{ position: "relative" }}>
+                    <label className="form-label">สกุลเงินสด</label>
                     <div style={{ position: "relative" }}>
-                      <Search size={17} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#94A3B8", pointerEvents: "none" }} />
+                      <Search
+                        size={17}
+                        style={{
+                          position: "absolute",
+                          left: 14,
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          color: "#94A3B8",
+                          pointerEvents: "none"
+                        }}
+                      />
                       <input
                         type="text"
                         className="form-input"
                         style={{ paddingLeft: 44 }}
-                        placeholder={
-                          type === "stock"  ? "พิมพ์ชื่อหุ้น เช่น Apple, NVDA, PTT, CPALL…" :
-                          type === "crypto" ? "พิมพ์ เช่น Bitcoin, ETH, SOL…" :
-                          "GC=F"
-                        }
-                        value={query}
-                        autoFocus
-                        onChange={e => { setQuery(e.target.value); setConfirmed(false); }}
-                        onFocus={() => { if (suggestions.length > 0) setShowDrop(true); }}
+                        placeholder="พิมพ์รหัสหรือชื่อสกุลเงิน เช่น THB, USD, JPY, EUR..."
+                        value={currencyQuery}
+                        onChange={(e) => {
+                          setCurrencyQuery(e.target.value);
+                          setShowCurrencyDrop(true);
+                        }}
+                        onFocus={() => setShowCurrencyDrop(true)}
                         onBlur={() => {
                           // Delay so onMouseDown on suggestion fires first
-                          setTimeout(() => setShowDrop(false), 180);
+                          setTimeout(() => setShowCurrencyDrop(false), 200);
                         }}
-                        onKeyDown={e => {
+                        onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
-                            if (suggestions.length > 0) {
-                              pickSuggestion(suggestions[0]);
+                            if (filteredCurrencies.length > 0) {
+                              const c = filteredCurrencies[0];
+                              setSymbol(c.code);
+                              setName(c.name);
+                              setCurrencyQuery(c.code);
+                              setShowCurrencyDrop(false);
+                              setConfirmed(true);
                             }
                           }
                         }}
+                        disabled={editingAsset}
                       />
-                      {searching && (
-                        <div className="spinner sm" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)" }} />
-                      )}
                     </div>
 
-                    {/* Dropdown */}
-                    {showDrop && suggestions.length > 0 && (
-                      <div className="suggestions-dropdown">
-                        {suggestions.map(item => (
-                          <div key={item.symbol} className="suggestion-item"
-                            onMouseDown={(e) => { e.preventDefault(); pickSuggestion(item); }}>
-                            <div className="suggestion-left">
-                              <span className="suggestion-symbol">{getDisplaySymbol(item.symbol)}</span>
-                              <span className="suggestion-name">{item.name}</span>
-                            </div>
-                            <div className="suggestion-right">
-                              <span className="suggestion-exchange">{item.exchange}</span>
-                              <span style={{ fontSize: 9, color: "var(--text-muted)", textTransform: "uppercase" }}>{item.type}</span>
-                            </div>
+                    {/* Selected currency indicator */}
+                    {symbol && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "var(--primary)",
+                          background: "var(--primary-light)",
+                          padding: "6px 12px",
+                          borderRadius: 10,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6
+                        }}
+                      >
+                        💵 เลือกแล้ว: <strong>{symbol}</strong> - {name}
+                      </div>
+                    )}
+
+                    {/* Dropdown list */}
+                    {showCurrencyDrop && (
+                      <div className="suggestions-dropdown" style={{ maxHeight: 220, overflowY: "auto", zIndex: 1000 }}>
+                        {filteredCurrencies.length === 0 ? (
+                          <div
+                            style={{
+                              padding: "10px 14px",
+                              fontSize: 13,
+                              color: "var(--text-muted)",
+                              textAlign: "center"
+                            }}
+                          >
+                            ไม่พบสกุลเงินที่ค้นหา
                           </div>
-                        ))}
+                        ) : (
+                          filteredCurrencies.map((c) => (
+                            <div
+                              key={c.code}
+                              className="suggestion-item"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setSymbol(c.code);
+                                setName(c.name);
+                                setCurrencyQuery(c.code);
+                                setShowCurrencyDrop(false);
+                                setConfirmed(true);
+                              }}
+                              style={{
+                                padding: "10px 14px",
+                                cursor: "pointer",
+                                background: symbol === c.code ? "var(--primary-light)" : "transparent",
+                                fontWeight: symbol === c.code ? 700 : 500
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                                <span style={{ color: symbol === c.code ? "var(--primary)" : "var(--text-main)" }}>
+                                  <strong>{c.code}</strong>
+                                </span>
+                                <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{c.name}</span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label className="form-label">
+                      {!editingAsset
+                        ? type === "stock"
+                          ? "ค้นหาหุ้น (ชื่อย่อหรือชื่อบริษัท)"
+                          : type === "crypto"
+                            ? "ค้นหาเหรียญ (เช่น Bitcoin, SOL)"
+                            : "ทองคำตลาดโลก"
+                        : "สินทรัพย์"}
+                    </label>
+
+                    {/* Confirmed chip */}
+                    {confirmed || editingAsset ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          background: "var(--primary-light)",
+                          border: "1.5px solid var(--primary)",
+                          borderRadius: 16,
+                          padding: "10px 14px"
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 800, color: "var(--primary)", fontSize: 15 }}>
+                            {getDisplaySymbol(symbol)}
+                          </div>
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{name}</div>
+                        </div>
+                        {!editingAsset && (
+                          <button
+                            type="button"
+                            className="btn-close"
+                            onClick={clearSymbol}
+                            style={{ background: "rgba(82,54,255,0.1)", color: "var(--primary)" }}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      /* Search input + dropdown */
+                      <div style={{ position: "relative" }}>
+                        <div style={{ position: "relative" }}>
+                          <Search
+                            size={17}
+                            style={{
+                              position: "absolute",
+                              left: 14,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              color: "#94A3B8",
+                              pointerEvents: "none"
+                            }}
+                          />
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ paddingLeft: 44 }}
+                            placeholder={
+                              type === "stock"
+                                ? "พิมพ์ชื่อหุ้น เช่น Apple, NVDA, PTT, CPALL…"
+                                : type === "crypto"
+                                  ? "พิมพ์ เช่น Bitcoin, ETH, SOL…"
+                                  : "GC=F"
+                            }
+                            value={query}
+                            autoFocus
+                            onChange={(e) => {
+                              setQuery(e.target.value);
+                              setConfirmed(false);
+                            }}
+                            onFocus={() => {
+                              if (suggestions.length > 0) setShowDrop(true);
+                            }}
+                            onBlur={() => {
+                              // Delay so onMouseDown on suggestion fires first
+                              setTimeout(() => setShowDrop(false), 180);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                if (suggestions.length > 0) {
+                                  pickSuggestion(suggestions[0]);
+                                }
+                              }
+                            }}
+                          />
+                          {searching && (
+                            <div
+                              className="spinner sm"
+                              style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)" }}
+                            />
+                          )}
+                        </div>
+
+                        {/* Dropdown */}
+                        {showDrop && suggestions.length > 0 && (
+                          <div className="suggestions-dropdown">
+                            {suggestions.map((item) => (
+                              <div
+                                key={item.symbol}
+                                className="suggestion-item"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  pickSuggestion(item);
+                                }}
+                              >
+                                <div className="suggestion-left">
+                                  <span className="suggestion-symbol">{getDisplaySymbol(item.symbol)}</span>
+                                  <span className="suggestion-name">{item.name}</span>
+                                </div>
+                                <div className="suggestion-right">
+                                  <span className="suggestion-exchange">{item.exchange}</span>
+                                  <span style={{ fontSize: 9, color: "var(--text-muted)", textTransform: "uppercase" }}>
+                                    {item.type}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Quick presets */}
+                    {!editingAsset && !confirmed && (
+                      <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {type === "crypto" && (
+                          <>
+                            {[
+                              ["BTC-USD", "Bitcoin"],
+                              ["ETH-USD", "Ethereum"],
+                              ["SOL-USD", "Solana"],
+                              ["BNB-USD", "BNB"]
+                            ].map(([s, n]) => (
+                              <button
+                                key={s}
+                                type="button"
+                                className="ripple-btn"
+                                style={{
+                                  height: 28,
+                                  borderRadius: 8,
+                                  padding: "0 10px",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  background: "#FFF7ED",
+                                  border: "1px solid #FED7AA",
+                                  cursor: "pointer",
+                                  fontFamily: "inherit"
+                                }}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  applyPreset(s, n);
+                                }}
+                              >
+                                {s.split("-")[0]}
+                              </button>
+                            ))}
+                          </>
+                        )}
+                        {type === "gold" && (
+                          <button
+                            type="button"
+                            className="ripple-btn"
+                            style={{
+                              height: 28,
+                              borderRadius: 8,
+                              padding: "0 10px",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              background: "var(--gold-light)",
+                              border: "1px solid #FCD34D",
+                              cursor: "pointer",
+                              fontFamily: "inherit"
+                            }}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              applyPreset("GC=F", "Spot Gold");
+                            }}
+                          >
+                            GC=F Spot Gold 🥇
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Quick presets */}
-                {!editingAsset && !confirmed && (
-                  <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {type === "crypto" && (
-                      <>
-                        {[["BTC-USD","Bitcoin"],["ETH-USD","Ethereum"],["SOL-USD","Solana"],["BNB-USD","BNB"]].map(([s,n]) => (
-                          <button key={s} type="button" className="ripple-btn"
-                            style={{ height: 28, borderRadius: 8, padding: "0 10px", fontSize: 11, fontWeight: 700, background: "#FFF7ED", border: "1px solid #FED7AA", cursor: "pointer", fontFamily: "inherit" }}
-                            onMouseDown={(e) => { e.preventDefault(); applyPreset(s, n); }}>
-                            {s.split("-")[0]}
-                          </button>
-                        ))}
-                      </>
-                    )}
-                    {type === "gold" && (
-                      <button type="button" className="ripple-btn"
-                        style={{ height: 28, borderRadius: 8, padding: "0 10px", fontSize: 11, fontWeight: 700, background: "var(--gold-light)", border: "1px solid #FCD34D", cursor: "pointer", fontFamily: "inherit" }}
-                        onMouseDown={(e) => { e.preventDefault(); applyPreset("GC=F", "Spot Gold"); }}>
-                        GC=F Spot Gold 🥇
+                {/* ── Transaction Type Selector (Buy/Sell or Deposit/Withdraw) ── */}
+                {confirmed && (
+                  <div className="form-group" style={{ marginBottom: 16 }}>
+                    <label className="form-label">ประเภทรายการ</label>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        background: "#F1F5F9",
+                        padding: 4,
+                        borderRadius: 12,
+                        gap: 4
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setTxType("BUY")}
+                        style={{
+                          height: 38,
+                          borderRadius: 10,
+                          border: "none",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          background:
+                            txType === "BUY" ? (type === "fiat" ? "var(--primary)" : "var(--gain)") : "transparent",
+                          color: txType === "BUY" ? "white" : "var(--text-muted)",
+                          transition: "var(--transition)"
+                        }}
+                      >
+                        {type === "fiat" ? "📥 ฝากเงินสด" : "🟢 ซื้อ (Buy)"}
                       </button>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => setTxType("SELL")}
+                        style={{
+                          height: 38,
+                          borderRadius: 10,
+                          border: "none",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          background: txType === "SELL" ? "var(--loss)" : "transparent",
+                          color: txType === "SELL" ? "white" : "var(--text-muted)",
+                          transition: "var(--transition)"
+                        }}
+                      >
+                        {type === "fiat" ? "📤 ถอนเงินสด" : "🔴 ขาย (Sell)"}
+                      </button>
+                    </div>
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* ── Transaction Type Selector (Buy/Sell or Deposit/Withdraw) ── */}
-            {confirmed && (
-              <div className="form-group" style={{ marginBottom: 16 }}>
-                <label className="form-label">ประเภทรายการ</label>
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  background: "#F1F5F9",
-                  padding: 4,
-                  borderRadius: 12,
-                  gap: 4
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => setTxType("BUY")}
-                    style={{
-                      height: 38,
-                      borderRadius: 10,
-                      border: "none",
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      background: txType === "BUY" ? (type === "fiat" ? "var(--primary)" : "var(--gain)") : "transparent",
-                      color: txType === "BUY" ? "white" : "var(--text-muted)",
-                      transition: "var(--transition)"
-                    }}
-                  >
-                    {type === "fiat" ? "📥 ฝากเงินสด" : "🟢 ซื้อ (Buy)"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTxType("SELL")}
-                    style={{
-                      height: 38,
-                      borderRadius: 10,
-                      border: "none",
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      background: txType === "SELL" ? "var(--loss)" : "transparent",
-                      color: txType === "SELL" ? "white" : "var(--text-muted)",
-                      transition: "var(--transition)"
-                    }}
-                  >
-                    {type === "fiat" ? "📤 ถอนเงินสด" : "🔴 ขาย (Sell)"}
-                  </button>
-                </div>
-              </div>
-            )}
+                {/* ── Qty & Price inputs ── */}
+                {type === "fiat" ? (
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <label className="form-label">จำนวนเงินสด</label>
+                      {currencyRateLoading && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4
+                          }}
+                        >
+                          <span className="spinner sm" style={{ width: 12, height: 12, borderWidth: "1.5px" }} />{" "}
+                          ดึงอัตราแลกเปลี่ยนปัจจุบัน...
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      ref={qtyInputRef}
+                      type="number"
+                      step="any"
+                      min="0.01"
+                      className="form-input"
+                      placeholder={`กรอกจำนวนเงินสด (${symbol || "สกุลเงิน"})`}
+                      value={qty}
+                      onChange={(e) => setQty(e.target.value)}
+                      required
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">จำนวน (หน่วย)</label>
+                      <input
+                        ref={qtyInputRef}
+                        type="number"
+                        step="any"
+                        min="0.000001"
+                        className="form-input"
+                        placeholder="เช่น 10, 1.5"
+                        value={qty}
+                        onChange={(e) => setQty(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">
+                        ราคาต่อหน่วย
+                        <span style={{ fontSize: 10, color: "var(--text-faint)", marginLeft: 4 }}>
+                          {symbol.includes(".BK") ? "(THB)" : "(USD)"}
+                        </span>
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        className="form-input"
+                        placeholder={symbol.includes(".BK") ? "บาท/หุ้น" : "USD/unit"}
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
 
-            {/* ── Qty & Price inputs ── */}
-            {type === "fiat" ? (
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <label className="form-label">จำนวนเงินสด</label>
-                  {currencyRateLoading && (
-                    <span style={{ fontSize: 11, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 4 }}>
-                      <span className="spinner sm" style={{ width: 12, height: 12, borderWidth: "1.5px" }} /> ดึงอัตราแลกเปลี่ยนปัจจุบัน...
-                    </span>
-                  )}
+                {/* ── Purchase Date & Time ── */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">
+                      วันที่ทำรายการ <span style={{ fontSize: 10, color: "var(--text-faint)" }}>(Log ประวัติ)</span>
+                    </label>
+                    <input type="date" className="form-input" value={date} onChange={(e) => setDate(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">
+                      เวลาที่ทำรายการ <span style={{ fontSize: 10, color: "var(--text-faint)" }}>(ระบุเวลา น.)</span>
+                    </label>
+                    <input type="time" className="form-input" value={time} onChange={(e) => setTime(e.target.value)} />
+                  </div>
                 </div>
-                <input
-                  ref={qtyInputRef}
-                  type="number"
-                  step="any"
-                  min="0.01"
-                  className="form-input"
-                  placeholder={`กรอกจำนวนเงินสด (${symbol || "สกุลเงิน"})`}
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">จำนวน (หน่วย)</label>
-                  <input ref={qtyInputRef} type="number" step="any" min="0.000001"
-                    className="form-input" placeholder="เช่น 10, 1.5"
-                    value={qty} onChange={e => setQty(e.target.value)} required />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
+
+                <div className="form-group" style={{ marginTop: 14, marginBottom: 0 }}>
                   <label className="form-label">
-                    ราคาต่อหน่วย
-                    <span style={{ fontSize: 10, color: "var(--text-faint)", marginLeft: 4 }}>
-                      {symbol.includes(".BK") ? "(THB)" : "(USD)"}
+                    {type === "fiat" ? "ธนาคาร" : "โบรกเกอร์"}{" "}
+                    <span style={{ fontSize: 10, color: "var(--text-faint)" }}>
+                      {type === "fiat" ? "(เช่น กสิกรไทย, SCB, etc.)" : "(เช่น Dime!, Webull, etc.)"}
                     </span>
                   </label>
-                  <input type="number" step="any" min="0"
-                    className="form-input" placeholder={symbol.includes(".BK") ? "บาท/หุ้น" : "USD/unit"}
-                    value={price} onChange={e => setPrice(e.target.value)} required />
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder={type === "fiat" ? "พิมพ์ธนาคารที่ฝากเงิน" : "พิมพ์โบรกเกอร์ที่ซื้อขาย"}
+                    value={broker}
+                    onChange={(e) => setBroker(e.target.value)}
+                  />
                 </div>
-              </div>
-            )}
 
-            {/* ── Purchase Date & Time ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">วันที่ทำรายการ <span style={{ fontSize: 10, color: "var(--text-faint)" }}>(Log ประวัติ)</span></label>
-                <input type="date" className="form-input"
-                  value={date} onChange={e => setDate(e.target.value)} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">เวลาที่ทำรายการ <span style={{ fontSize: 10, color: "var(--text-faint)" }}>(ระบุเวลา น.)</span></label>
-                <input type="time" className="form-input"
-                  value={time} onChange={e => setTime(e.target.value)} />
-              </div>
-            </div>
+                {/* ── Purchase History (ถ้ามี lots แล้ว) ── */}
+                {editingAsset && lots.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <button
+                      type="button"
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "8px 0",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: "var(--text-muted)",
+                        fontFamily: "inherit",
+                        width: "100%"
+                      }}
+                      onClick={() => setShowHistory((p) => !p)}
+                    >
+                      <History size={14} />
+                      ประวัติการซื้อ ({lots.length} รายการ)
+                      {showHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
 
-            <div className="form-group" style={{ marginTop: 14, marginBottom: 0 }}>
-              <label className="form-label">
-                {type === "fiat" ? "ธนาคาร" : "โบรกเกอร์"}{" "}
-                <span style={{ fontSize: 10, color: "var(--text-faint)" }}>
-                  {type === "fiat" ? "(เช่น กสิกรไทย, SCB, etc.)" : "(เช่น Dime!, Webull, etc.)"}
-                </span>
-              </label>
-              <input type="text" className="form-input"
-                placeholder={type === "fiat" ? "พิมพ์ธนาคารที่ฝากเงิน" : "พิมพ์โบรกเกอร์ที่ซื้อขาย"}
-                value={broker} onChange={e => setBroker(e.target.value)} />
-            </div>
-
-            {/* ── Purchase History (ถ้ามี lots แล้ว) ── */}
-            {editingAsset && lots.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <button type="button"
-                  style={{
-                    background: "none", border: "none", cursor: "pointer", padding: "8px 0",
-                    display: "flex", alignItems: "center", gap: 6,
-                    fontSize: 13, fontWeight: 700, color: "var(--text-muted)", fontFamily: "inherit", width: "100%"
-                  }}
-                  onClick={() => setShowHistory(p => !p)}>
-                  <History size={14} />
-                  ประวัติการซื้อ ({lots.length} รายการ)
-                  {showHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-
-                {showHistory && (
-                  <div style={{
-                    border: "1px solid var(--border)", borderRadius: 16,
-                    overflow: "hidden", marginTop: 6, animation: "fadeIn 0.2s ease-out"
-                  }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                      <thead>
-                        <tr style={{ background: "#F8FAFC" }}>
-                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: "var(--text-muted)" }}>วันที่</th>
-                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "var(--text-muted)" }}>จำนวน</th>
-                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "var(--text-muted)" }}>ราคาทุน</th>
-                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "var(--text-muted)" }}>มูลค่า</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[...lots].reverse().map((lot, i) => (
-                          <tr key={lot.id || i} style={{ borderTop: "1px solid var(--border)" }}>
-                            <td style={{ padding: "9px 12px", color: "var(--text-muted)" }}>
-                              <div>{fmtDate(lot.date)} {lot.time ? `· ${lot.time} น.` : ""}</div>
-                              {lot.broker && (
-                                <div style={{
-                                  fontSize: 9,
+                    {showHistory && (
+                      <div
+                        style={{
+                          border: "1px solid var(--border)",
+                          borderRadius: 16,
+                          overflow: "hidden",
+                          marginTop: 6,
+                          animation: "fadeIn 0.2s ease-out"
+                        }}
+                      >
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ background: "#F8FAFC" }}>
+                              <th
+                                style={{
+                                  padding: "8px 12px",
+                                  textAlign: "left",
+                                  fontWeight: 700,
+                                  color: "var(--text-muted)"
+                                }}
+                              >
+                                วันที่
+                              </th>
+                              <th
+                                style={{
+                                  padding: "8px 12px",
+                                  textAlign: "right",
+                                  fontWeight: 700,
+                                  color: "var(--text-muted)"
+                                }}
+                              >
+                                จำนวน
+                              </th>
+                              <th
+                                style={{
+                                  padding: "8px 12px",
+                                  textAlign: "right",
+                                  fontWeight: 700,
+                                  color: "var(--text-muted)"
+                                }}
+                              >
+                                ราคาทุน
+                              </th>
+                              <th
+                                style={{
+                                  padding: "8px 12px",
+                                  textAlign: "right",
+                                  fontWeight: 700,
+                                  color: "var(--text-muted)"
+                                }}
+                              >
+                                มูลค่า
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...lots].reverse().map((lot, i) => (
+                              <tr key={lot.id || i} style={{ borderTop: "1px solid var(--border)" }}>
+                                <td style={{ padding: "9px 12px", color: "var(--text-muted)" }}>
+                                  <div>
+                                    {fmtDate(lot.date)} {lot.time ? `· ${lot.time} น.` : ""}
+                                  </div>
+                                  {lot.broker && (
+                                    <div
+                                      style={{
+                                        fontSize: 9,
+                                        fontWeight: 700,
+                                        color: "var(--primary)",
+                                        background: "var(--primary-light)",
+                                        padding: "1px 4px",
+                                        borderRadius: 4,
+                                        display: "inline-block",
+                                        marginTop: 2
+                                      }}
+                                    >
+                                      {lot.broker}
+                                    </div>
+                                  )}
+                                </td>
+                                <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 600 }}>
+                                  {fmtQty(lot.qty)}
+                                </td>
+                                <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 600 }}>
+                                  {fmtUSD(lot.price)}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: "9px 12px",
+                                    textAlign: "right",
+                                    fontWeight: 700,
+                                    color: "var(--primary)"
+                                  }}
+                                >
+                                  {fmtUSD(lot.qty * lot.price)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr style={{ borderTop: "1.5px solid var(--border)", background: "var(--primary-light)" }}>
+                              <td colSpan={2} style={{ padding: "8px 12px", fontWeight: 700, color: "var(--primary)" }}>
+                                รวม
+                              </td>
+                              <td
+                                style={{
+                                  padding: "8px 12px",
+                                  textAlign: "right",
                                   fontWeight: 700,
                                   color: "var(--primary)",
-                                  background: "var(--primary-light)",
-                                  padding: "1px 4px",
-                                  borderRadius: 4,
-                                  display: "inline-block",
-                                  marginTop: 2
-                                }}>
-                                  {lot.broker}
-                                </div>
-                              )}
-                            </td>
-                            <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 600 }}>{fmtQty(lot.qty)}</td>
-                            <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 600 }}>{fmtUSD(lot.price)}</td>
-                            <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 700, color: "var(--primary)" }}>
-                              {fmtUSD(lot.qty * lot.price)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr style={{ borderTop: "1.5px solid var(--border)", background: "var(--primary-light)" }}>
-                          <td colSpan={2} style={{ padding: "8px 12px", fontWeight: 700, color: "var(--primary)" }}>รวม</td>
-                          <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "var(--primary)", fontSize: 11 }}>
-                            avg {fmtUSD(editingAsset.avgCost)}
-                          </td>
-                          <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 800, color: "var(--primary)" }}>
-                            {fmtUSD(lots.reduce((s, l) => s + l.qty * l.price, 0))}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                                  fontSize: 11
+                                }}
+                              >
+                                avg {fmtUSD(editingAsset.avgCost)}
+                              </td>
+                              <td
+                                style={{
+                                  padding: "8px 12px",
+                                  textAlign: "right",
+                                  fontWeight: 800,
+                                  color: "var(--primary)"
+                                }}
+                              >
+                                {fmtUSD(lots.reduce((s, l) => s + l.qty * l.price, 0))}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Tip box */}
-            {!editingAsset && (
-              <div style={{
-                marginTop: 14, background: "#FFFBEB", border: "1px solid #FEF3C7",
-                borderRadius: 14, padding: "10px 14px", fontSize: 11, color: "#92400E",
-                lineHeight: 1.6, display: "flex", gap: 8
-              }}>
-                <span>💡</span>
-                <span>
-                  {type === "stock"  && "พิมพ์ชื่อหุ้นที่ต้องการค้นหาแล้วเลือกจากรายการได้เลย · หุ้นไทยราคาหน่วยเป็นบาท"}
-                  {type === "crypto" && "ต่อท้ายด้วย -USD เช่น BTC-USD · ราคาทุนใส่เป็น USD"}
-                  {type === "gold"   && "GC=F คือ Spot Gold, CL=F คือ Crude Oil ตลาดโลก (USD)"}
-                  {type === "fiat"   && "กรอกจำนวนเงินสดที่คุณถือครองและเลือกสกุลเงินสดได้เลย"}
-                </span>
-              </div>
+                {/* Tip box */}
+                {!editingAsset && (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      background: "#FFFBEB",
+                      border: "1px solid #FEF3C7",
+                      borderRadius: 14,
+                      padding: "10px 14px",
+                      fontSize: 11,
+                      color: "#92400E",
+                      lineHeight: 1.6,
+                      display: "flex",
+                      gap: 8
+                    }}
+                  >
+                    <span>💡</span>
+                    <span>
+                      {type === "stock" &&
+                        "พิมพ์ชื่อหุ้นที่ต้องการค้นหาแล้วเลือกจากรายการได้เลย · หุ้นไทยราคาหน่วยเป็นบาท"}
+                      {type === "crypto" && "ต่อท้ายด้วย -USD เช่น BTC-USD · ราคาทุนใส่เป็น USD"}
+                      {type === "gold" && "GC=F คือ Spot Gold, CL=F คือ Crude Oil ตลาดโลก (USD)"}
+                      {type === "fiat" && "กรอกจำนวนเงินสดที่คุณถือครองและเลือกสกุลเงินสดได้เลย"}
+                    </span>
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
-
           </div>
 
           {/* Footer */}
           <div className="modal-footer">
-            <button type="button" className="btn btn-secondary ripple-btn" onClick={onClose}
-              style={{ height: 48, flex: "0 0 100px" }}>
+            <button
+              type="button"
+              className="btn btn-secondary ripple-btn"
+              onClick={onClose}
+              style={{ height: 48, flex: "0 0 100px" }}
+            >
               ยกเลิก
             </button>
-            <button type="submit" className="btn btn-primary ripple-btn"
+            <button
+              type="submit"
+              className="btn btn-primary ripple-btn"
               style={{ height: 48, flex: 1 }}
-              disabled={scannedQueue.length === 0 && !symbol}>
+              disabled={scannedQueue.length === 0 && !symbol}
+            >
               <Save size={16} />
               {editingAsset
-                ? (txType === "SELL"
-                    ? (type === "fiat" ? `ถอนเงินสด -${qty ? fmtQty(parseFloat(qty) || 0) : "?"} THB` : `ขายออก -${qty ? fmtQty(parseFloat(qty) || 0) : "?"} หน่วย`)
-                    : (type === "fiat" ? `ฝากเงินสด +${qty ? fmtQty(parseFloat(qty) || 0) : "?"} THB` : `ซื้อเพิ่ม +${qty ? fmtQty(parseFloat(qty) || 0) : "?"} หน่วย`)
-                  )
-                : (scannedQueue.length > 0 ? `ยืนยันและนำเข้าทั้งหมด (${scannedQueue.length} รายการ)` : "เพิ่มเข้าพอร์ต")}
+                ? txType === "SELL"
+                  ? type === "fiat"
+                    ? `ถอนเงินสด -${qty ? fmtQty(parseFloat(qty) || 0) : "?"} THB`
+                    : `ขายออก -${qty ? fmtQty(parseFloat(qty) || 0) : "?"} หน่วย`
+                  : type === "fiat"
+                    ? `ฝากเงินสด +${qty ? fmtQty(parseFloat(qty) || 0) : "?"} THB`
+                    : `ซื้อเพิ่ม +${qty ? fmtQty(parseFloat(qty) || 0) : "?"} หน่วย`
+                : scannedQueue.length > 0
+                  ? `ยืนยันและนำเข้าทั้งหมด (${scannedQueue.length} รายการ)`
+                  : "เพิ่มเข้าพอร์ต"}
             </button>
           </div>
         </form>

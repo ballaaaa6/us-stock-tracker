@@ -21,19 +21,21 @@ describe("api service client", () => {
 
       const result = await api.auth.login("alice", "pass123");
 
-      expect(fetch).toHaveBeenCalledWith("/api/auth/login", expect.objectContaining({
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "alice", password: "pass123" })
-      }));
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/login",
+        expect.objectContaining({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: "alice", password: "pass123" })
+        })
+      );
       expect(result).toEqual(mockUser);
     });
 
     it("should throw an error on failed login requests", async () => {
       fetch.mockImplementation(() => mockResponse(401, { error: "รหัสผ่านไม่ถูกต้อง" }, false));
 
-      await expect(api.auth.login("alice", "wrongpass"))
-        .rejects.toThrow("รหัสผ่านไม่ถูกต้อง");
+      await expect(api.auth.login("alice", "wrongpass")).rejects.toThrow("รหัสผ่านไม่ถูกต้อง");
     });
 
     it("should post register requests and return success details", async () => {
@@ -42,10 +44,13 @@ describe("api service client", () => {
 
       const result = await api.auth.register("bob", "secret123");
 
-      expect(fetch).toHaveBeenCalledWith("/api/auth/register", expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ username: "bob", password: "secret123" })
-      }));
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/register",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ username: "bob", password: "secret123" })
+        })
+      );
       expect(result).toEqual(mockResult);
     });
 
@@ -55,10 +60,13 @@ describe("api service client", () => {
 
       await api.auth.changePassword("alice", "old123", "new123");
 
-      expect(fetch).toHaveBeenCalledWith("/api/auth/change-password", expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ username: "alice", oldPassword: "old123", newPassword: "new123" })
-      }));
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/auth/change-password",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ username: "alice", oldPassword: "old123", newPassword: "new123" })
+        })
+      );
     });
   });
 
@@ -69,12 +77,15 @@ describe("api service client", () => {
 
       const result = await api.profile.get("user-token-123");
 
-      expect(fetch).toHaveBeenCalledWith("/api/profile", expect.objectContaining({
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer user-token-123"
-        }
-      }));
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/profile",
+        expect.objectContaining({
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer user-token-123"
+          }
+        })
+      );
       expect(result).toEqual(mockProfile);
     });
 
@@ -84,14 +95,17 @@ describe("api service client", () => {
 
       await api.profile.update("user-token-123", mockProfile);
 
-      expect(fetch).toHaveBeenCalledWith("/api/profile", expect.objectContaining({
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer user-token-123"
-        },
-        body: JSON.stringify(mockProfile)
-      }));
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/profile",
+        expect.objectContaining({
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer user-token-123"
+          },
+          body: JSON.stringify(mockProfile)
+        })
+      );
     });
   });
 
@@ -102,12 +116,15 @@ describe("api service client", () => {
 
       const result = await api.portfolio.get("user-token-123");
 
-      expect(fetch).toHaveBeenCalledWith("/api/portfolio", expect.objectContaining({
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer user-token-123"
-        }
-      }));
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/portfolio",
+        expect.objectContaining({
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer user-token-123"
+          }
+        })
+      );
       expect(result).toEqual(mockPortfolio);
     });
 
@@ -117,10 +134,13 @@ describe("api service client", () => {
 
       await api.portfolio.update("user-token-123", assets);
 
-      expect(fetch).toHaveBeenCalledWith("/api/portfolio", expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify(assets)
-      }));
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/portfolio",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify(assets)
+        })
+      );
     });
   });
 
@@ -165,14 +185,17 @@ describe("api service client", () => {
 
       await api.ocr.scan("user-token-123", scanPayload);
 
-      expect(fetch).toHaveBeenCalledWith("/api/scan", expect.objectContaining({
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer user-token-123"
-        },
-        body: JSON.stringify(scanPayload)
-      }));
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/scan",
+        expect.objectContaining({
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer user-token-123"
+          },
+          body: JSON.stringify(scanPayload)
+        })
+      );
     });
   });
 });

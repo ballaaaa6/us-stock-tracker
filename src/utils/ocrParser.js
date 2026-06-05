@@ -95,15 +95,15 @@ export function getDimeReceiptSchema() {
     items: {
       type: "OBJECT",
       properties: {
-        index:           { type: "INTEGER",  description: "Image index number" },
-        transactionType: { type: "STRING",   description: "BUY or SELL",                     enum: ["BUY", "SELL"] },
-        symbol:          { type: "STRING",   description: "Stock ticker symbol (uppercase)" },
-        name:            { type: "STRING",   description: "Full company/asset name" },
-        category:        { type: "STRING",   description: "Asset category",                  enum: ["stock", "crypto", "gold", "fiat"] },
-        qty:             { type: "NUMBER",   description: "Quantity of shares/units" },
-        price:           { type: "NUMBER",   description: "Executed price per share (ราคาที่ได้จริง)" },
-        date:            { type: "STRING",   description: "Transaction date in YYYY-MM-DD format" },
-        time:            { type: "STRING",   description: "Transaction time in HH:MM format" }
+        index: { type: "INTEGER", description: "Image index number" },
+        transactionType: { type: "STRING", description: "BUY or SELL", enum: ["BUY", "SELL"] },
+        symbol: { type: "STRING", description: "Stock ticker symbol (uppercase)" },
+        name: { type: "STRING", description: "Full company/asset name" },
+        category: { type: "STRING", description: "Asset category", enum: ["stock", "crypto", "gold", "fiat"] },
+        qty: { type: "NUMBER", description: "Quantity of shares/units" },
+        price: { type: "NUMBER", description: "Executed price per share (ราคาที่ได้จริง)" },
+        date: { type: "STRING", description: "Transaction date in YYYY-MM-DD format" },
+        time: { type: "STRING", description: "Transaction time in HH:MM format" }
       },
       required: ["index", "transactionType", "symbol", "name", "category", "qty", "price", "date", "time"]
     }
@@ -132,7 +132,9 @@ export function validateParsedReceipt(data, imageIndex) {
   if (!data) return null;
 
   // ── Symbol cleanup ──
-  let symbol = String(data.symbol || "").trim().toUpperCase();
+  let symbol = String(data.symbol || "")
+    .trim()
+    .toUpperCase();
   // Allow Thai mutual fund symbols with hyphens (e.g. K-USA, SCB-GOLD)
   symbol = symbol.replace(/[^A-Z0-9.-]/g, "");
   if (!symbol || /^\d+$/.test(symbol)) return null;

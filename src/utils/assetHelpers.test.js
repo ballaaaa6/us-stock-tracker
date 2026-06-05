@@ -91,16 +91,14 @@ describe("assetHelpers", () => {
     });
 
     it("should return 0 when there are only BUY lots", () => {
-      const lots = [
-        { date: "2026-06-01", qty: 10, price: 100 }
-      ];
+      const lots = [{ date: "2026-06-01", qty: 10, price: 100 }];
       expect(getRealizedPnL(lots)).toBe(0);
     });
 
     it("should calculate correct PnL for simple BUY and SELL transactions", () => {
       const lots = [
         { date: "2026-06-01", qty: 10, price: 100 }, // Buy 10 at 100 (Total cost = 1000, avg cost = 100)
-        { date: "2026-06-02", qty: -5, price: 120 }  // Sell 5 at 120. PnL = (120 - 100) * 5 = 100.
+        { date: "2026-06-02", qty: -5, price: 120 } // Sell 5 at 120. PnL = (120 - 100) * 5 = 100.
       ];
       expect(getRealizedPnL(lots)).toBe(100);
     });
@@ -118,7 +116,7 @@ describe("assetHelpers", () => {
       const exchangeRate = 35.0;
       const lots = [
         { date: "2026-06-01", qty: 10, price: 3500 }, // Buy 10 at 3500 THB (= 100 USD each, total 1000 USD, avg cost 100 USD)
-        { date: "2026-06-02", qty: -5, price: 4200 }  // Sell 5 at 4200 THB (= 120 USD each). PnL = (120 - 100) * 5 = 100 USD.
+        { date: "2026-06-02", qty: -5, price: 4200 } // Sell 5 at 4200 THB (= 120 USD each). PnL = (120 - 100) * 5 = 100 USD.
       ];
       expect(getRealizedPnL(lots, true, exchangeRate)).toBe(100);
     });
