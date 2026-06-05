@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import Dashboard from "./components/Dashboard";
+import ErrorBoundary from "./components/common/ErrorBoundary";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -63,7 +64,11 @@ export default function App() {
         <Register onNavigateToLogin={() => setCurrentPage("login")} showToast={showToast} />
       )}
 
-      {currentPage === "dashboard" && user && <Dashboard user={user} onLogout={handleLogout} showToast={showToast} />}
+      {currentPage === "dashboard" && user && (
+        <ErrorBoundary>
+          <Dashboard user={user} onLogout={handleLogout} showToast={showToast} />
+        </ErrorBoundary>
+      )}
 
       {/* 3. Global Floating Toast Notification Banner */}
       {toast.show && (

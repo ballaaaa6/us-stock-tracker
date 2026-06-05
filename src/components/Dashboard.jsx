@@ -1,32 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { api } from "../services/api";
-import {
-  Plus,
-  RefreshCw,
-  LogOut,
-  Trash2,
-  Download,
-  Upload,
-  PieChart,
-  Pencil,
-  X,
-  Settings,
-  Eye,
-  EyeOff,
-  Sparkles
-} from "lucide-react";
+import { Plus, LogOut, Download, Upload, PieChart, X, Eye, Sparkles } from "lucide-react";
 import AssetModal from "./AssetModal";
 import AssetDetailPanel from "./AssetDetailPanel";
 
 import { fmtUSD, fmtTHB, fmtPct, fmtQty, fmtDate } from "../utils/formatters";
 
-import {
-  getDisplaySymbol,
-  getAssetFullName,
-  getCurrencyTicker,
-  getCurrencyPriceUSD,
-  getRealizedPnL
-} from "../utils/assetHelpers";
+import { getDisplaySymbol, getCurrencyTicker, getCurrencyPriceUSD, getRealizedPnL } from "../utils/assetHelpers";
 
 import DashboardHeader from "./dashboard/DashboardHeader";
 import KPIRow from "./dashboard/KPIRow";
@@ -35,6 +14,11 @@ import DonutChart from "./dashboard/DonutChart";
 import AssetTable from "./dashboard/AssetTable";
 import PnLDetailsModal from "./dashboard/PnLDetailsModal";
 import PortfolioChart from "./charts/PortfolioChart";
+
+import { useProfile } from "../hooks/useProfile";
+import { usePrices } from "../hooks/usePrices";
+import { usePortfolio } from "../hooks/usePortfolio";
+import { usePortfolioHistory } from "../hooks/usePortfolioHistory";
 
 const CATEGORY_LABELS = { stock: "หุ้น", crypto: "คริปโต", gold: "ทองคำ/น้ำมัน", fiat: "เงินสด" };
 
@@ -86,12 +70,15 @@ export default function Dashboard({ user, onLogout, showToast }) {
     localStorage.setItem("hide_portfolio_values", hideValues ? "true" : "false");
   }, [hideValues]);
 
-  const [assets, setAssets] = useState([]);
-  const [prices, setPrices] = useState({});
-  const [sparklines, setSparklines] = useState({}); // { SYM: { dates, closes } }
-  const [portfolioHistory, setPortfolioHistory] = useState([]); // [{date, value}]
-  const [exchangeRate, setExchangeRate] = useState(35.0);
-  const [historicalRates, setHistoricalRates] = useState({});
+  const [sortConfig, setSortConfig] = useState({ key: "value", dir: "desc" });
+  const [chartRange, setChartRange] = useState("1D");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingAsset, setEditingAsset] = useState(null);
+  const [selectedAsset, setSelectedAsset] = useState(null);
+  const [showPnLDetailsModal, setShowPnLDetailsModal] = useState(false);
+  const [donutDrillCategory, setDonutDrillCategory] = useState(null);
+
+  const assetsRef = useRef([]);
 
   const fmt = useMemo(
     () => ({
@@ -104,899 +91,138 @@ export default function Dashboard({ user, onLogout, showToast }) {
     [hideValues]
   );
 
-  const getHistoricalRate = useCallback(
-    (dateStr) => {
-      if (!dateStr) return exchangeRate;
-      const targetDate = dateStr.split("T")[0];
-      if (historicalRates[targetDate]) {
-        return historicalRates[targetDate];
-      }
-      const dates = Object.keys(historicalRates).sort();
-      if (dates.length === 0) return exchangeRate;
-      let bestRate = exchangeRate;
-      for (const d of dates) {
-        if (d <= targetDate) {
-          bestRate = historicalRates[d];
-        } else {
-          break;
-        }
-      }
-      return bestRate;
-    },
-    [historicalRates, exchangeRate]
-  );
+  // Initialize custom hooks
+  const {
+    prices,
+    sparklines,
+    exchangeRate,
+    historicalRates,
+    refreshing,
+    sparklineLoading,
+    autoRefresh,
+    setAutoRefresh,
+    priceFlash,
+    fetchPrices,
+    fetchSparklines,
+    getRealizedPnLInTHB,
+    getHistoricalRate
+  } = usePrices({ user, showToast, assetsRef });
 
-  const getRealizedPnLInTHB = useCallback(
-    (lots, isThai) => {
-      if (!lots || !lots.length) return 0;
-      const sortedLots = [...lots].sort((a, b) => new Date(a.date) - new Date(b.date));
-      let realizedTHB = 0;
-      let currentQty = 0;
-      let currentAvgCostUSD = 0;
-      for (const lot of sortedLots) {
-        const lotQty = lot.qty;
-        let lotPriceUSD = lot.price || 0;
-        const txRate = getHistoricalRate(lot.date);
-        if (isThai && txRate) {
-          lotPriceUSD = lotPriceUSD / txRate;
-        }
-        if (lotQty > 0) {
-          const newQty = currentQty + lotQty;
-          const newCost = currentQty * currentAvgCostUSD + lotQty * lotPriceUSD;
-          currentAvgCostUSD = newQty > 0 ? newCost / newQty : 0;
-          currentQty = newQty;
-        } else if (lotQty < 0) {
-          const sellQty = Math.abs(lotQty);
-          const gainUSD = (lotPriceUSD - currentAvgCostUSD) * sellQty;
-          const gainTHB = gainUSD * txRate;
-          realizedTHB += gainTHB;
-          currentQty = Math.max(0, currentQty - sellQty);
-        }
-      }
-      return realizedTHB;
-    },
-    [getHistoricalRate]
-  );
+  const { assets, loading, savePortfolio, handleClearAsset, handleDeleteAsset, handleSaveAsset, handleClearPortfolio } =
+    usePortfolio({
+      user,
+      showToast,
+      fetchPrices,
+      fetchSparklines,
+      chartRange,
+      exchangeRate,
+      getRealizedPnLInTHB,
+      hideValues
+    });
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [sparklineLoading, setSparklineLoading] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [chartRange, setChartRange] = useState("1D");
-  const [sortConfig, setSortConfig] = useState({ key: "value", dir: "desc" });
-  const [priceFlash, setPriceFlash] = useState({}); // { SYM: "up"|"down" }
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingAsset, setEditingAsset] = useState(null);
-  const [selectedAsset, setSelectedAsset] = useState(null);
-  const [portfolioName, setPortfolioName] = useState(
-    () => localStorage.getItem(`portfolio_name_${user.username}`) || "StockVault"
-  );
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [tempName, setTempName] = useState("");
-  const [showPnLDetailsModal, setShowPnLDetailsModal] = useState(false);
-
-  const syncProfileToServer = async (name, pic, nick) => {
-    if (user.username === "local_user") return;
-    try {
-      await api.profile.update(user.token, {
-        portfolioName: name,
-        profilePic: pic,
-        nickname: nick
-      });
-    } catch (err) {
-      console.error("Profile sync failed:", err);
-    }
-  };
-
-  useEffect(() => {
-    const fetchProfileSync = async () => {
-      try {
-        const data = await api.profile.get(user.token);
-        if (data.portfolioName) {
-          setPortfolioName(data.portfolioName);
-          localStorage.setItem(`portfolio_name_${user.username}`, data.portfolioName);
-        }
-        if (data.profilePic) {
-          setProfilePic(data.profilePic);
-          localStorage.setItem(`profile_pic_${user.username}`, data.profilePic);
-        }
-        if (data.nickname) {
-          setNickname(data.nickname);
-          localStorage.setItem(`profile_nickname_${user.username}`, data.nickname);
-        }
-      } catch (err) {
-        console.warn("โหลดโปรไฟล์จากเซิร์ฟเวอร์ไม่สำเร็จ ใช้ข้อมูล Local แทน:", err.message);
-      }
-    };
-    fetchProfileSync();
-  }, [user.token, user.username]);
-
-  const handleSaveName = async () => {
-    const trimmed = tempName.trim();
-    if (trimmed) {
-      setPortfolioName(trimmed);
-      localStorage.setItem(`portfolio_name_${user.username}`, trimmed);
-      await syncProfileToServer(trimmed, profilePic, nickname);
-    }
-    setIsEditingName(false);
-  };
-
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [profilePic, setProfilePic] = useState(() => localStorage.getItem(`profile_pic_${user.username}`) || "");
-  const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
-  const [avatarHovered, setAvatarHovered] = useState(false);
-  const [presetModalOpen, setPresetModalOpen] = useState(false);
-  const [donutDrillCategory, setDonutDrillCategory] = useState(null);
-  const [nickname, setNickname] = useState(() => localStorage.getItem(`profile_nickname_${user.username}`) || "");
-  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem("gemini_api_key") || "");
-
-  const [newNickname, setNewNickname] = useState("");
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-
-  useEffect(() => {
-    if (profileModalOpen) {
-      setNewNickname(nickname);
-      setOldPassword("");
-      setNewPassword("");
-    }
-  }, [profileModalOpen, nickname]);
-
-  const handleAvatarUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      showToast("ขนาดไฟล์ต้องไม่เกิน 10MB", "error");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
-        const MAX_DIM = 300;
-
-        if (width > MAX_DIM || height > MAX_DIM) {
-          if (width > height) {
-            height = Math.round((height * MAX_DIM) / width);
-            width = MAX_DIM;
-          } else {
-            width = Math.round((width * MAX_DIM) / height);
-            height = MAX_DIM;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
-        setProfilePic(compressedDataUrl);
-      };
-      img.onerror = () => {
-        showToast("ไม่สามารถประมวลผลไฟล์รูปภาพนี้ได้", "error");
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSaveProfile = async () => {
-    try {
-      const trimmedNickname = newNickname.trim();
-      localStorage.setItem(`profile_nickname_${user.username}`, trimmedNickname);
-      setNickname(trimmedNickname);
-      localStorage.setItem(`profile_pic_${user.username}`, profilePic);
-      showToast("บันทึกข้อมูลโปรไฟล์สำเร็จ!", "success");
-      setProfileModalOpen(false);
-      await syncProfileToServer(portfolioName, profilePic, trimmedNickname);
-    } catch (err) {
-      showToast("เกิดข้อผิดพลาดในการบันทึกโปรไฟล์", "error");
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (!oldPassword || !newPassword) {
-      showToast("กรุณากรอกรหัสผ่านเดิมและรหัสผ่านใหม่ให้ครบถ้วน", "error");
-      return;
-    }
-    if (newPassword.length < 6) {
-      showToast("รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร", "error");
-      return;
-    }
-
-    try {
-      await api.auth.changePassword(user.username, oldPassword, newPassword);
-      showToast("เปลี่ยนรหัสผ่านสำเร็จแล้ว!", "success");
-      setOldPassword("");
-      setNewPassword("");
-    } catch (err) {
-      showToast("เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน", "error");
-    }
-  };
-
-  const prevPricesRef = useRef({});
-  const assetsRef = useRef([]);
+  // Keep assetsRef in sync for usePrices's interval
   assetsRef.current = assets;
 
-  const handleClearAsset = async (assetId) => {
-    const asset = assets.find((a) => a.id === assetId);
-    if (!asset) return;
+  const {
+    portfolioName,
+    isEditingName,
+    setIsEditingName,
+    tempName,
+    setTempName,
+    profileModalOpen,
+    setProfileModalOpen,
+    profilePic,
+    setProfilePic,
+    avatarPreviewOpen,
+    setAvatarPreviewOpen,
+    avatarHovered,
+    setAvatarHovered,
+    presetModalOpen,
+    setPresetModalOpen,
+    nickname,
+    newNickname,
+    setNewNickname,
+    oldPassword,
+    setOldPassword,
+    newPassword,
+    setNewPassword,
+    handleSaveName,
+    handleAvatarUpload,
+    handleSaveProfile,
+    handleChangePassword,
+    resetProfile
+  } = useProfile({ user, showToast });
 
-    const displaySym = asset.broker
-      ? `${getDisplaySymbol(asset.symbol)} (${asset.broker})`
-      : getDisplaySymbol(asset.symbol);
-    const confirmMsg = `คุณแน่ใจหรือไม่ที่จะล้างผลตอบแทนสะสมที่รับรู้แล้ว (Realized P&L) ของ ${displaySym} ให้กลับไปเป็น 0? \n\nการดำเนินการนี้จะล้างเฉพาะค่าผลตอบแทนสะสมในอดีต โดยจะไม่ส่งผลกระทบใดๆ ต่อรายการประวัติการซื้อขายดั้งเดิม หรือจำนวนหุ้นที่คุณถืออยู่ปัจจุบัน`;
-    if (!confirm(confirmMsg)) return;
+  const { portfolioHistory } = usePortfolioHistory({
+    assets,
+    prices,
+    sparklines,
+    exchangeRate,
+    chartRange
+  });
 
-    const isThai = asset.symbol.toUpperCase().endsWith(".BK");
-    const rawRealized = getRealizedPnL(asset.lots || [], isThai, exchangeRate);
-    const rawRealizedTHB = getRealizedPnLInTHB(asset.lots || [], isThai);
-
-    const updatedAssets = assets.map((a) => {
-      if (a.id === assetId) {
-        return {
-          ...a,
-          clearedRealizedUSD: rawRealized,
-          clearedRealizedTHB: rawRealizedTHB
-        };
-      }
-      return a;
-    });
-
-    await savePortfolio(updatedAssets);
-    await fetchPrices(updatedAssets);
-    fetchSparklines(updatedAssets, chartRange);
-    showToast(`ล้างผลตอบแทนสะสมที่รับรู้แล้วของ ${displaySym} เรียบร้อย`, "success");
-  };
-
-  const handleDeleteAsset = async (param, fromModal = false) => {
-    const assetId = typeof param === "string" ? param : param?.id;
-    const asset = assets.find((a) => a.id === assetId);
-    if (!asset) return;
-
-    const displaySym = asset.broker
-      ? `${getDisplaySymbol(asset.symbol)} (${asset.broker})`
-      : getDisplaySymbol(asset.symbol);
-
-    if (fromModal) {
-      if (asset.qty > 0) {
-        alert(
-          `❌ ไม่สามารถลบ ${displaySym} จากหน้ากำไร/ขาดทุนรายตัวได้เนื่องจากยังมีหุ้นเหลืออยู่บนหน้าหลัก (${asset.qty} หน่วย)\n\nกรุณาลบจากหน้ากระดานหลัก หรือทำธุรกรรมขายออกให้หมดก่อน`
-        );
-        return;
-      }
-    }
-
-    const confirmMsg = `คุณแน่ใจหรือไม่ที่จะลบสินทรัพย์ ${displaySym} และประวัติธุรกรรมทั้งหมดออกอย่างถาวร?`;
-    if (!confirm(confirmMsg)) return;
-
-    const updatedAssets = assets.filter((a) => a.id !== assetId);
-    try {
-      await savePortfolio(updatedAssets);
-      await fetchPrices(updatedAssets);
-      fetchSparklines(updatedAssets, chartRange);
-      showToast(`ลบสินทรัพย์ ${displaySym} ออกเรียบร้อย`, "success");
-    } catch (err) {
-      showToast("ลบไม่สำเร็จ: " + err.message, "error");
-    }
-  };
-
-  const savePortfolio = async (updatedAssets) => {
-    setAssets(updatedAssets);
-    localStorage.setItem(`local_portfolio_${user.username}`, JSON.stringify(updatedAssets));
-
-    try {
-      await api.portfolio.update(user.token, updatedAssets);
-    } catch (err) {
-      console.warn("ไม่สามารถเซฟข้อมูลลง Cloudflare ได้ ใช้ Local Storage แทน:", err.message);
-      showToast("บันทึกข้อมูลในอุปกรณ์เครื่องนี้แล้ว (เซิร์ฟเวอร์ออฟไลน์)", "warning");
-    }
-  };
-
-  /* ── FETCH PORTFOLIO ── */
-  const fetchPortfolio = async () => {
-    try {
-      const data = await api.portfolio.get(user.token);
-      setAssets(data);
-      localStorage.setItem(`local_portfolio_${user.username}`, JSON.stringify(data));
-      await fetchPrices(data);
-      if (data.length > 0) fetchSparklines(data, chartRange);
-    } catch (err) {
-      console.warn("โหลดพอร์ตจากเซิร์ฟเวอร์ไม่สำเร็จ ใช้ข้อมูล Local แทน:", err.message);
-      const localData = JSON.parse(localStorage.getItem(`local_portfolio_${user.username}`) || "[]");
-      setAssets(localData);
-      await fetchPrices(localData);
-      if (localData.length > 0) fetchSparklines(localData, chartRange);
-      showToast("ใช้ข้อมูลพอร์ตที่บันทึกในเครื่องชั่วคราว", "info");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /* ── FETCH LIVE PRICES ── */
-  const fetchPrices = async (portfolioAssets) => {
-    setRefreshing(true);
-    try {
-      const symbols = portfolioAssets
-        .map((a) => {
-          const isCashAsset = a.type === "fiat" || a.category === "fiat";
-          if (isCashAsset) {
-            if (a.symbol === "USD") return null;
-            return getCurrencyTicker(a.symbol);
-          }
-          return a.symbol;
-        })
-        .filter(Boolean)
-        .join(",");
-
-      if (!symbols) {
-        setPrices({});
-        setRefreshing(false);
-        return;
-      }
-
-      let data = null;
-      try {
-        data = await api.prices.getForSymbols(symbols);
-      } catch (apiErr) {
-        console.warn("fetchPrices API network error, falling back to mock:", apiErr.message);
-      }
-
-      if (data) {
-        const newPrices = data.quotes || {};
-
-        // Detect price changes for flash animation
-        const flash = {};
-        Object.keys(newPrices).forEach((sym) => {
-          const prev = prevPricesRef.current[sym]?.price;
-          const curr = newPrices[sym]?.price;
-          if (prev != null && curr != null && curr !== prev) {
-            flash[sym] = curr > prev ? "up" : "down";
-          }
-        });
-        if (Object.keys(flash).length > 0) {
-          setPriceFlash(flash);
-          setTimeout(() => setPriceFlash({}), 1600);
-        }
-
-        prevPricesRef.current = newPrices;
-        setPrices(newPrices);
-        if (data.exchangeRate) setExchangeRate(data.exchangeRate);
-      } else {
-        const newPrices = { ...prevPricesRef.current };
-        const symList = symbols ? symbols.split(",") : [];
-
-        symList.forEach((s) => {
-          const cleanSym = s.toUpperCase();
-          let basePrice = 100.0;
-
-          const matchAsset = portfolioAssets.find(
-            (a) => a.symbol.toUpperCase() === cleanSym || getCurrencyTicker(a.symbol).toUpperCase() === cleanSym
-          );
-          if (matchAsset) {
-            basePrice = matchAsset.avgCost || matchAsset.avgPrice || 100.0;
-          }
-
-          const changePercent = (Math.random() - 0.5) * 0.02;
-          const lastPrice = prevPricesRef.current[cleanSym]?.price || basePrice;
-          const currPrice = lastPrice * (1 + changePercent);
-
-          newPrices[cleanSym] = {
-            price: currPrice,
-            change: changePercent * 100,
-            changesPercentage: changePercent * 100,
-            marketState: "REGULAR",
-            displayName: cleanSym
-          };
-        });
-
-        const mockExchangeRate = 35.0 + (Math.random() - 0.5) * 0.2;
-        setExchangeRate(mockExchangeRate);
-
-        newPrices["THB=X"] = {
-          price: mockExchangeRate,
-          change: 0.0,
-          changesPercentage: 0.0,
-          marketState: "REGULAR",
-          displayName: "THB"
-        };
-        newPrices["USD"] = {
-          price: 1.0,
-          change: 0,
-          changesPercentage: 0,
-          marketState: "REGULAR"
-        };
-
-        const flash = {};
-        Object.keys(newPrices).forEach((sym) => {
-          const prev = prevPricesRef.current[sym]?.price;
-          const curr = newPrices[sym]?.price;
-          if (prev != null && curr != null && curr !== prev) {
-            flash[sym] = curr > prev ? "up" : "down";
-          }
-        });
-        if (Object.keys(flash).length > 0) {
-          setPriceFlash(flash);
-          setTimeout(() => setPriceFlash({}), 1600);
-        }
-
-        prevPricesRef.current = newPrices;
-        setPrices(newPrices);
-      }
-    } catch (err) {
-      console.error("Price fetch error:", err);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  /* ── FETCH SPARKLINES ── */
-  const fetchSparklines = async (portfolioAssets, range) => {
-    if (!portfolioAssets.length) return;
-    setSparklineLoading(true);
-    try {
-      const syms = [
-        ...new Set(
-          portfolioAssets
-            .map((a) => {
-              const isCashAsset = a.type === "fiat" || a.category === "fiat";
-              if (isCashAsset) {
-                if (a.symbol === "USD") return null;
-                return getCurrencyTicker(a.symbol);
-              }
-              return a.symbol;
-            })
-            .filter(Boolean)
-        )
-      ];
-
-      // Calculate optimal timeframe range based on earliest transaction date
-      let earliestDate = null;
-      portfolioAssets.forEach((asset) => {
-        const assetLots = asset.lots && asset.lots.length > 0 ? asset.lots : [];
-        assetLots.forEach((lot) => {
-          if (lot && lot.date && lot.date !== "1970-01-01") {
-            if (!earliestDate || lot.date < earliestDate) {
-              earliestDate = lot.date;
-            }
-          }
-        });
-      });
-
-      let optimalRange = range;
-      if (earliestDate) {
-        const earliestTime = new Date(earliestDate + "T00:00:00.000Z").getTime();
-        const ageInDays = (Date.now() - earliestTime) / 86400000;
-
-        const rangeDurationDays = {
-          "1D": 1,
-          "1W": 7,
-          "1M": 30,
-          "3M": 90,
-          "6M": 180,
-          YTD: 365,
-          "1Y": 365,
-          "5Y": 1825,
-          MAX: Infinity
-        };
-
-        const rangesOrder = ["1D", "1W", "1M", "3M", "6M", "YTD", "1Y", "5Y", "MAX"];
-        let matchedRange = "1D";
-        for (const r of rangesOrder) {
-          matchedRange = r;
-          if (rangeDurationDays[r] >= ageInDays) {
-            break;
-          }
-        }
-
-        const requestedIdx = rangesOrder.indexOf(range);
-        const matchedIdx = rangesOrder.indexOf(matchedRange);
-        if (matchedIdx < requestedIdx) {
-          optimalRange = matchedRange;
-        }
-      }
-
-      let data = null;
-      try {
-        data = await api.prices.getSparkline(syms.join(","), optimalRange);
-      } catch (apiErr) {
-        console.warn("fetchSparklines API network error, falling back to mock:", apiErr.message);
-      }
-
-      if (data) {
-        setSparklines(data);
-      } else {
-        const mockSparklines = {};
-        const days =
-          {
-            "1D": 24,
-            "1W": 7,
-            "1M": 30,
-            "3M": 90,
-            "6M": 180,
-            YTD: 150,
-            "1Y": 252,
-            "5Y": 252 * 5,
-            MAX: 252 * 5
-          }[optimalRange] || 30;
-
-        const nowTime = Date.now();
-        const dateInterval =
-          {
-            "1D": 3600 * 1000,
-            "1W": 24 * 3600 * 1000,
-            "1M": 24 * 3600 * 1000,
-            "3M": 24 * 3600 * 1000,
-            "6M": 24 * 3600 * 1000,
-            YTD: 24 * 3600 * 1000,
-            "1Y": 24 * 3600 * 1000,
-            "5Y": 7 * 24 * 3600 * 1000,
-            MAX: 7 * 24 * 3600 * 1000
-          }[optimalRange] || 24 * 3600 * 1000;
-
-        syms.forEach((sym) => {
-          const cleanSym = sym.toUpperCase();
-          const dates = [];
-          const closes = [];
-
-          let basePrice = 100.0;
-          const matchAsset = portfolioAssets.find(
-            (a) => a.symbol.toUpperCase() === cleanSym || getCurrencyTicker(a.symbol).toUpperCase() === cleanSym
-          );
-          if (matchAsset) {
-            basePrice = matchAsset.avgCost || matchAsset.avgPrice || 100.0;
-          }
-
-          let currentVal = basePrice * 0.9;
-
-          for (let i = days; i >= 0; i--) {
-            const timeAt = nowTime - i * dateInterval;
-            const dateStr = new Date(timeAt).toISOString();
-            const drift = (Math.random() - 0.48) * 0.03;
-            currentVal = currentVal * (1 + drift);
-            if (currentVal < 0.01) currentVal = 0.01;
-
-            dates.push(dateStr);
-            closes.push(currentVal);
-          }
-
-          mockSparklines[cleanSym] = { dates, closes };
-        });
-
-        const thbCloses = [];
-        const thbDates = [];
-        let currThb = 35.0;
-        for (let i = days; i >= 0; i--) {
-          const timeAt = nowTime - i * dateInterval;
-          const dateStr = new Date(timeAt).toISOString();
-          const drift = (Math.random() - 0.5) * 0.005;
-          currThb = currThb * (1 + drift);
-          thbDates.push(dateStr);
-          thbCloses.push(currThb);
-        }
-        mockSparklines["THB=X"] = { dates: thbDates, closes: thbCloses };
-
-        setSparklines(mockSparklines);
-      }
-    } catch (err) {
-      console.error("Sparkline fetch error:", err);
-    } finally {
-      setSparklineLoading(false);
-    }
-  };
-
-  /* ── COMPUTE PORTFOLIO HISTORY ── */
-  useEffect(() => {
-    if (!Object.keys(sparklines).length || !assets.length) {
-      setPortfolioHistory([]);
+  const handleClearAllData = async () => {
+    if (
+      !window.confirm(
+        "⚠️ คำเตือน: คุณต้องการล้างข้อมูลทุกอย่างทั้งหมด (ทั้งข้อมูลหุ้น, ชื่อเล่น, และรูปโปรไฟล์) กลับเป็นค่าเริ่มต้นใช่หรือไม่?"
+      )
+    )
       return;
+    try {
+      await savePortfolio([]);
+      await resetProfile();
+      showToast("🗑️ ล้างข้อมูลทั้งหมดในระบบเรียบร้อยแล้ว!", "success");
+      setProfileModalOpen(false);
+    } catch (err) {
+      showToast("ล้างข้อมูลไม่สำเร็จ: " + err.message, "error");
     }
+  };
 
-    const isShortTF = chartRange === "1D" || chartRange === "5D" || chartRange === "1W";
-
-    const symbolPriceHistories = {};
-    Object.keys(sparklines).forEach((sym) => {
-      const symData = sparklines[sym];
-      if (symData && symData.dates && symData.dates.length > 0) {
-        const points = symData.dates
-          .map((d, idx) => ({
-            dateStr: isShortTF ? d : d.split("T")[0],
-            price: symData.closes[idx]
-          }))
-          .filter((p) => p.price != null && p.price > 0);
-        points.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
-        symbolPriceHistories[sym.toUpperCase()] = points;
-      }
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify({ assets, exportedAt: new Date().toISOString() }, null, 2)], {
+      type: "application/json"
     });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `portfolio-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("📥 ส่งออกข้อมูลสำเร็จ", "success");
+  };
 
-    const getPriceOnDate = (sym, targetDateStr) => {
-      const points = symbolPriceHistories[sym.toUpperCase()];
-      const todayStr = new Date().toISOString().split("T")[0];
-      if (!isShortTF && targetDateStr.startsWith(todayStr)) {
-        const livePrice = prices[sym.toUpperCase()]?.price;
-        if (livePrice != null && livePrice > 0) {
-          return livePrice;
-        }
-      }
-
-      if (points && points.length > 0) {
-        for (let i = points.length - 1; i >= 0; i--) {
-          if (points[i].dateStr <= targetDateStr) {
-            return points[i].price;
-          }
-        }
-        return points[0].price;
-      }
-
-      const livePrice = prices[sym.toUpperCase()]?.price;
-      if (livePrice != null && livePrice > 0) {
-        return livePrice;
-      }
-
-      const asset = assets.find((a) => a.symbol.toUpperCase() === sym.toUpperCase());
-      if (asset) {
-        const avg = asset.avgCost ?? asset.avgPrice ?? 0;
-        if (avg > 0) return avg;
-      }
-      return null;
-    };
-
-    const allDatesSet = new Set();
-    Object.keys(sparklines).forEach((sym) => {
-      const symData = sparklines[sym];
-      if (symData && symData.dates) {
-        symData.dates.forEach((d) => {
-          if (d) {
-            if (isShortTF) {
-              allDatesSet.add(d);
-            } else {
-              allDatesSet.add(d.split("T")[0]);
-            }
-          }
-        });
-      }
-    });
-
-    if (allDatesSet.size === 0) {
-      setPortfolioHistory([]);
-      return;
-    }
-
-    if (isShortTF) {
-      allDatesSet.add(new Date().toISOString());
-    } else {
-      allDatesSet.add(new Date().toISOString().split("T")[0]);
-    }
-
-    let timeline = Array.from(allDatesSet).sort((a, b) => a.localeCompare(b));
-
-    let earliestDate = null;
-    assets.forEach((asset) => {
-      const assetLots = asset.lots && asset.lots.length > 0 ? asset.lots : [];
-      assetLots.forEach((lot) => {
-        if (lot && lot.date && lot.date !== "1970-01-01") {
-          if (!earliestDate || lot.date < earliestDate) {
-            earliestDate = lot.date;
-          }
-        }
-      });
-    });
-
-    let rawStartDateStr = null;
-    Object.keys(sparklines).forEach((sym) => {
-      const symData = sparklines[sym];
-      if (symData && symData.dates && symData.dates.length > 0) {
-        const firstDate = symData.dates[0];
-        if (firstDate) {
-          const dStr = firstDate.split("T")[0];
-          if (!rawStartDateStr || dStr < rawStartDateStr) {
-            rawStartDateStr = dStr;
-          }
-        }
-      }
-    });
-
-    if (earliestDate) {
-      const earliestStr = earliestDate.split("T")[0];
-      if (rawStartDateStr && earliestStr > rawStartDateStr) {
-        timeline = timeline.filter((d) => {
-          const dStr = isShortTF ? d.split("T")[0] : d;
-          return dStr >= earliestStr;
-        });
-
-        const firstTimelineDate = timeline[0] ? (isShortTF ? timeline[0].split("T")[0] : timeline[0]) : "";
-        if (timeline.length > 0 && firstTimelineDate > earliestStr) {
-          timeline.unshift(isShortTF ? earliestStr + "T00:00:00.000Z" : earliestStr);
-        } else if (timeline.length === 0) {
-          timeline.push(isShortTF ? earliestStr + "T00:00:00.000Z" : earliestStr);
-        }
-      }
-    }
-
-    const assetLotsWithMappedIdx = assets.map((asset) => {
-      const isThai = asset.symbol.toUpperCase().endsWith(".BK");
-      const isCashAsset = asset.type === "fiat" || asset.category === "fiat";
-
-      const rawLots =
-        asset.lots && asset.lots.length > 0
-          ? asset.lots
-          : [
-              {
-                id: "virtual",
-                date: "1970-01-01",
-                time: "00:00",
-                qty: asset.qty,
-                price: asset.avgCost ?? asset.avgPrice ?? 0
-              }
-            ];
-
-      const mappedLots = rawLots
-        .map((lot) => {
-          if (!lot || !lot.date) return null;
-          const lotTime = new Date(lot.date + "T" + (lot.time || "00:00") + ":00.000Z").getTime();
-
-          let bestIdx = 0;
-          let bestDiff = Infinity;
-          timeline.forEach((tStr, idx) => {
-            const tTime = new Date(tStr.includes("T") ? tStr : tStr + "T00:00:00.000Z").getTime();
-            const diff = Math.abs(tTime - lotTime);
-            if (diff < bestDiff) {
-              bestDiff = diff;
-              bestIdx = idx;
-            }
-          });
-
-          return { ...lot, mappedIdx: bestIdx };
-        })
-        .filter(Boolean);
-
-      return {
-        ...asset,
-        lots: mappedLots,
-        isThai,
-        isCashAsset
-      };
-    });
-
-    let history = timeline.map((date, idx) => {
-      let totalUSD = 0;
-      let totalCostUSD = 0;
-
-      assetLotsWithMappedIdx.forEach((asset) => {
-        const lotsBeforeOrOnDate = asset.lots.filter((lot) => lot.mappedIdx <= idx);
-        if (lotsBeforeOrOnDate.length === 0) return;
-
-        const qtyOnDate = lotsBeforeOrOnDate.reduce((sum, l) => sum + (l.qty || 0), 0);
-
-        const costOnDateUSD = lotsBeforeOrOnDate.reduce((sum, l) => {
-          let priceUSD = asset.isThai ? (l.price || 0) / exchangeRate : l.price || 0;
-          if (asset.isCashAsset) {
-            if (asset.symbol === "USD") {
-              priceUSD = 1.0;
-            } else {
-              priceUSD = l.price || getCurrencyPriceUSD(asset.symbol, prices, exchangeRate);
-            }
-          }
-          return sum + (l.qty || 0) * priceUSD;
-        }, 0);
-
-        if (asset.isCashAsset) {
-          let priceUSD = 0;
-          if (asset.symbol === "USD") {
-            priceUSD = 1.0;
-          } else {
-            const ticker = getCurrencyTicker(asset.symbol);
-            const priceVal = getPriceOnDate(ticker, date);
-            if (priceVal != null && priceVal > 0) {
-              if (["EUR", "GBP", "AUD", "NZD"].includes(asset.symbol)) {
-                priceUSD = priceVal;
-              } else {
-                priceUSD = 1.0 / priceVal;
-              }
-            } else {
-              priceUSD = asset.symbol === "THB" ? 1.0 / (exchangeRate || 35.0) : 1.0;
-            }
-          }
-
-          const valueUSD = priceUSD * qtyOnDate;
-          totalUSD += valueUSD;
-          totalCostUSD += costOnDateUSD;
+  const handleImport = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        const imported = parsed.assets || parsed;
+        if (!Array.isArray(imported)) {
+          showToast("ไฟล์ไม่ถูกต้อง", "error");
           return;
         }
-
-        const price = getPriceOnDate(asset.symbol, date);
-        let priceUSD = 0;
-        if (price != null && price > 0) {
-          priceUSD = asset.isThai ? price / exchangeRate : price;
-        } else {
-          const livePrice = prices[asset.symbol.toUpperCase()]?.price;
-          if (livePrice != null && livePrice > 0) {
-            priceUSD = asset.isThai ? livePrice / exchangeRate : livePrice;
-          } else {
-            priceUSD = qtyOnDate > 0 ? costOnDateUSD / qtyOnDate : 0;
-          }
-        }
-        const valueUSD = priceUSD * qtyOnDate;
-        totalUSD += valueUSD;
-        totalCostUSD += costOnDateUSD;
-      });
-
-      const dateIso = date.includes("T") ? date : date + "T00:00:00.000Z";
-      return { date: dateIso, value: totalUSD, cost: totalCostUSD };
-    });
-
-    history = history.filter((d) => d.value > 0);
-
-    if (history.length === 1) {
-      const singlePoint = history[0];
-      const prevDate = new Date(new Date(singlePoint.date) - 86400000).toISOString();
-      history.unshift({ date: prevDate, value: singlePoint.value, cost: singlePoint.cost });
-    }
-
-    setPortfolioHistory(history);
-  }, [sparklines, assets, prices, exchangeRate, chartRange]);
-
-  /* ── CHART RANGE CHANGE ── */
-  const handleRangeChange = useCallback((r) => {
-    setChartRange(r);
-    if (assetsRef.current.length > 0) fetchSparklines(assetsRef.current, r);
-  }, []);
-
-  /* ── AUTO-REFRESH ENGINE ── */
-  useEffect(() => {
-    fetchPortfolio();
-  }, []);
-
-  useEffect(() => {
-    const fetchHistoricalRates = async () => {
-      let data = null;
-      try {
-        data = await api.prices.getHistory("THB=X", "MAX");
-      } catch (apiErr) {
-        console.warn("fetchHistoricalRates API network error, falling back to mock:", apiErr.message);
-      }
-
-      if (data) {
-        const rates = {};
-        if (data.candles) {
-          data.candles.forEach((c) => {
-            if (c.date && c.close) {
-              const dateKey = c.date.split("T")[0];
-              rates[dateKey] = c.close;
-            }
-          });
-        }
-        setHistoricalRates(rates);
-      } else {
-        const rates = {};
-        const now = Date.now();
-        let currentThb = 35.0;
-        for (let i = 0; i < 3650; i++) {
-          const timeAt = now - i * 24 * 3600 * 1000;
-          const dateKey = new Date(timeAt).toISOString().split("T")[0];
-          const drift = (Math.random() - 0.5) * 0.002;
-          currentThb = currentThb * (1 + drift);
-          if (currentThb < 28) currentThb = 28;
-          if (currentThb > 40) currentThb = 40;
-          rates[dateKey] = currentThb;
-        }
-        setHistoricalRates(rates);
+        await savePortfolio(imported);
+        showToast(`✅ นำเข้า ${imported.length} รายการสำเร็จ`, "success");
+        fetchPrices(imported);
+        fetchSparklines(imported, chartRange);
+      } catch {
+        showToast("ไฟล์ไม่ถูกต้อง", "error");
       }
     };
-    fetchHistoricalRates();
-  }, [user.username]);
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const iv = setInterval(() => fetchPrices(assetsRef.current), 30000);
-    return () => clearInterval(iv);
-  }, [autoRefresh]);
+  const handleRangeChange = useCallback(
+    (r) => {
+      setChartRange(r);
+      if (assetsRef.current.length > 0) fetchSparklines(assetsRef.current, r);
+    },
+    [fetchSparklines]
+  );
 
-  /* ── SORT TABLE ── */
   const handleSort = (key) => {
     setSortConfig((prev) =>
       prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }
@@ -1283,287 +509,6 @@ export default function Dashboard({ user, onLogout, showToast }) {
   const totalGainPct = initialCapitalUSD > 0 ? (totalGainUSD / initialCapitalUSD) * 100 : 0;
   const todayChangePct = totalCostUSD > 0 ? (todayChangeUSD / (totalUSD - todayChangeUSD)) * 100 : 0;
 
-  /* ── SAVE ASSET ── */
-  const handleSaveAsset = async (formData) => {
-    const isBatch = Array.isArray(formData);
-    const transactions = isBatch ? formData : [formData];
-
-    const sortedTx = [...transactions].sort((a, b) => {
-      const isABuy = a.transactionType === "BUY";
-      const isBBuy = b.transactionType === "BUY";
-      if (isABuy !== isBBuy) {
-        return isABuy ? -1 : 1;
-      }
-      const dtA = new Date(`${a.date || "1970-01-01"}T${a.time || "00:00"}`);
-      const dtB = new Date(`${b.date || "1970-01-01"}T${b.time || "00:00"}`);
-      return dtA - dtB;
-    });
-
-    const skippedTxs = [];
-
-    try {
-      let updatedAssets = [...assets];
-
-      const getTodayLocalDate = () => {
-        const d = new Date();
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${year}-${month}-${day}`;
-      };
-
-      for (const tx of sortedTx) {
-        const sym = (tx.symbol || "").trim().toUpperCase();
-        const name = (tx.name || sym).trim();
-        const newQty = parseFloat(tx.qty);
-        const newPrice = parseFloat(tx.avgPrice ?? tx.price ?? 0);
-        const category = tx.type ?? tx.category ?? "stock";
-        const broker = (tx.broker || "").trim();
-
-        let buyDate = tx.date ? tx.date.trim() : "";
-        if (!buyDate) {
-          buyDate = getTodayLocalDate();
-        }
-        let buyTime = tx.time ? tx.time.trim() : "";
-        if (!buyTime) {
-          buyTime = "00:00";
-        }
-
-        if (!sym) {
-          if (!isBatch) showToast("เลือกสินทรัพย์ก่อนนะครับ", "error");
-          else skippedTxs.push({ tx, reason: "ไม่พบสัญลักษณ์สินทรัพย์" });
-          continue;
-        }
-        if (isNaN(newQty) || newQty <= 0) {
-          if (!isBatch) showToast("ใส่จำนวนให้ถูกต้อง", "error");
-          else skippedTxs.push({ tx: { symbol: sym, ...tx }, reason: "จำนวนหุ้นไม่ถูกต้อง" });
-          continue;
-        }
-        if (isNaN(newPrice) || newPrice < 0) {
-          if (!isBatch) showToast("ใส่ราคาทุนให้ถูกต้อง", "error");
-          else skippedTxs.push({ tx: { symbol: sym, ...tx }, reason: "ราคาทุนไม่ถูกต้อง" });
-          continue;
-        }
-
-        const isSell = tx.transactionType === "SELL";
-        const displaySym = broker ? `${sym} (${broker})` : sym;
-
-        const existingIdx = updatedAssets.findIndex(
-          (a) => a.symbol === sym && (a.broker || "").trim().toLowerCase() === broker.toLowerCase()
-        );
-
-        if (isSell) {
-          if (existingIdx < 0) {
-            if (!isBatch) {
-              showToast(`❌ ไม่สามารถขาย ${displaySym} ได้ เพราะไม่มีในพอร์ตโฟลิโอ\nกรุณาเพิ่มรายการซื้อก่อน`, "error");
-              return;
-            } else {
-              skippedTxs.push({ tx: { symbol: sym, ...tx }, reason: `ไม่มีสินทรัพย์ ${displaySym} นี้ในพอร์ตโฟลิโอ` });
-              continue;
-            }
-          } else {
-            const existing = updatedAssets[existingIdx];
-            if (newQty > existing.qty) {
-              if (!isBatch) {
-                showToast(
-                  `❌ ขาย ${displaySym} ไม่ได้ — จำนวนที่ขาย (${fmtQty(newQty, hideValues)}) มากกว่าที่ถืออยู่ (${fmtQty(existing.qty, hideValues)} หน่วย)`,
-                  "error"
-                );
-                return;
-              } else {
-                skippedTxs.push({
-                  tx: { symbol: sym, ...tx },
-                  reason: `จำนวนหุ้นไม่เพียงพอ (ขาย ${fmtQty(newQty, hideValues)} แต่ในพอร์ตมี ${fmtQty(existing.qty, hideValues)})`
-                });
-                continue;
-              }
-            }
-          }
-        }
-
-        if (existingIdx >= 0) {
-          const existingAsset = updatedAssets[existingIdx];
-          const duplicateLot = (existingAsset.lots || []).find((l) => {
-            const sameDate = l.date === buyDate;
-            const sameTime = (l.time || "") === buyTime;
-            const sameQty = Math.abs(l.qty - (isSell ? -newQty : newQty)) < 0.00001;
-            const samePrice = Math.abs(l.price - newPrice) < 0.00001;
-            const sameBroker = (l.broker || "").trim().toLowerCase() === broker.toLowerCase();
-            return sameDate && sameTime && sameQty && samePrice && sameBroker;
-          });
-          if (duplicateLot) {
-            const confirmMsg = `⚠️ ตรวจพบธุรกรรมที่อาจซ้ำซ้อน:\nมีรายการ ${isSell ? "ขาย" : "ซื้อ"} ${displaySym} จำนวน ${newQty} หุ้น @ $${newPrice} วันที่ ${buyDate} ${buyTime ? "เวลา " + buyTime + " น." : ""} อยู่ในระบบแล้ว\n\nคุณต้องการบันทึกธุรกรรมนี้เพิ่มอีกรายการใช่หรือไม่?`;
-            if (!confirm(confirmMsg)) {
-              if (isBatch) {
-                skippedTxs.push({ tx: { symbol: sym, ...tx }, reason: "ผู้ใช้ยกเลิกเนื่องจากพบธุรกรรมซ้ำซ้อน" });
-              }
-              continue;
-            }
-          }
-        }
-
-        const newLot = {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          date: buyDate,
-          time: buyTime,
-          qty: isSell ? -newQty : newQty,
-          price: newPrice,
-          broker: broker
-        };
-
-        if (existingIdx >= 0) {
-          const existing = updatedAssets[existingIdx];
-          const oldLots = existing.lots || [];
-          const allLots = [...oldLots, newLot];
-          const totalQty = allLots.reduce((s, l) => s + l.qty, 0);
-
-          const buyLots = allLots.filter((l) => l.qty > 0);
-          const buyQty = buyLots.reduce((s, l) => s + l.qty, 0);
-          const buyCost = buyLots.reduce((s, l) => s + l.qty * l.price, 0);
-          const avgCost = buyQty > 0 ? buyCost / buyQty : 0;
-
-          updatedAssets[existingIdx] = {
-            ...existing,
-            lots: allLots,
-            qty: totalQty,
-            avgCost: avgCost
-          };
-
-          if (!isBatch) {
-            const isCash = category === "fiat";
-            showToast(
-              isSell
-                ? `✅ ${isCash ? "ถอนเงินสด" : "ขายออก"} ${displaySym} ${fmtQty(newQty, hideValues)} หน่วยสำเร็จ`
-                : `✅ ${isCash ? "ฝากเพิ่ม" : "ซื้อเพิ่ม"} ${displaySym} ${fmtQty(newQty, hideValues)} หน่วยสำเร็จ`,
-              "success"
-            );
-          }
-        } else {
-          updatedAssets.push({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            symbol: sym,
-            name,
-            category,
-            broker,
-            lots: [newLot],
-            qty: isSell ? -newQty : newQty,
-            avgCost: newPrice
-          });
-          if (!isBatch) {
-            const isCash = category === "fiat";
-            showToast(`✅ เพิ่ม ${isCash ? "เงินสด" : "สินทรัพย์"} ${displaySym} เข้าพอร์ตแล้ว`, "success");
-          }
-        }
-      }
-
-      await savePortfolio(updatedAssets);
-
-      setModalOpen(false);
-      setEditingAsset(null);
-      await fetchPrices(updatedAssets);
-      fetchSparklines(updatedAssets, chartRange);
-
-      if (isBatch) {
-        if (skippedTxs.length > 0) {
-          const successCount = sortedTx.length - skippedTxs.length;
-          const errorDetails = skippedTxs
-            .map(
-              (s) =>
-                `- ${s.tx.symbol} (${s.tx.transactionType === "BUY" ? "ซื้อ" : "ขาย"} · ${s.tx.qty} หน่วย): ${s.reason}`
-            )
-            .join("\n");
-          alert(
-            `⚠️ นำเข้าธุรกรรมสำเร็จ ${successCount}/${sortedTx.length} รายการ\n\nรายการที่ถูกข้ามเนื่องจากข้อผิดพลาด:\n${errorDetails}`
-          );
-        } else {
-          showToast(`✅ นำเข้าธุรกรรมทั้งหมด ${sortedTx.length} รายการสำเร็จ!`, "success");
-        }
-      }
-    } catch (err) {
-      showToast("บันทึกไม่สำเร็จ: " + err.message, "error");
-    }
-  };
-
-  /* ── CLEAR PORTFOLIO ── */
-  const handleClearPortfolio = async () => {
-    if (
-      !confirm("⚠️ คุณต้องการล้างข้อมูลหุ้นและธุรกรรมทั้งหมดในพอร์ตใช่หรือไม่? (ชื่อเล่นและรูปโปรไฟล์ของคุณจะไม่ถูกลบ)")
-    )
-      return;
-    try {
-      await savePortfolio([]);
-      showToast("🗑️ ล้างข้อมูลพอร์ตหุ้นเรียบร้อยแล้ว!", "success");
-      setProfileModalOpen(false);
-    } catch (err) {
-      showToast("ล้างข้อมูลไม่สำเร็จ: " + err.message, "error");
-    }
-  };
-
-  /* ── CLEAR ALL DATA ── */
-  const handleClearAllData = async () => {
-    if (
-      !confirm(
-        "⚠️ คำเตือน: คุณต้องการล้างข้อมูลทุกอย่างทั้งหมด (ทั้งข้อมูลหุ้น, ชื่อเล่น, และรูปโปรไฟล์) กลับเป็นค่าเริ่มต้นใช่หรือไม่?"
-      )
-    )
-      return;
-    try {
-      await savePortfolio([]);
-
-      setProfilePic("");
-      setNickname("");
-      setNewNickname("");
-      setPortfolioName("StockVault");
-      localStorage.removeItem(`profile_pic_${user.username}`);
-      localStorage.removeItem(`profile_nickname_${user.username}`);
-      localStorage.removeItem(`portfolio_name_${user.username}`);
-      await syncProfileToServer("StockVault", "", "");
-
-      showToast("🗑️ ล้างข้อมูลทั้งหมดในระบบเรียบร้อยแล้ว!", "success");
-      setProfileModalOpen(false);
-    } catch (err) {
-      showToast("ล้างข้อมูลไม่สำเร็จ: " + err.message, "error");
-    }
-  };
-
-  /* ── EXPORT / IMPORT ── */
-  const handleExport = () => {
-    const blob = new Blob([JSON.stringify({ assets, exportedAt: new Date().toISOString() }, null, 2)], {
-      type: "application/json"
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `portfolio-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("📥 ส่งออกข้อมูลสำเร็จ", "success");
-  };
-
-  const handleImport = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      try {
-        const parsed = JSON.parse(ev.target.result);
-        const imported = parsed.assets || parsed;
-        if (!Array.isArray(imported)) {
-          showToast("ไฟล์ไม่ถูกต้อง", "error");
-          return;
-        }
-        await savePortfolio(imported);
-        showToast(`✅ นำเข้า ${imported.length} รายการสำเร็จ`, "success");
-        fetchPrices(imported);
-        fetchSparklines(imported, chartRange);
-      } catch {
-        showToast("ไฟล์ไม่ถูกต้อง", "error");
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  };
-
   if (loading) {
     return (
       <div className="loading-overlay" style={{ minHeight: "100vh" }}>
@@ -1719,7 +664,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
             setModalOpen(false);
             setEditingAsset(null);
           }}
-          onSave={handleSaveAsset}
+          onSave={(formData) => handleSaveAsset(formData, setModalOpen, setEditingAsset)}
           exchangeRate={exchangeRate}
           showToast={showToast}
         />
@@ -1882,7 +827,7 @@ export default function Dashboard({ user, onLogout, showToast }) {
                       <button
                         type="button"
                         onClick={() => {
-                          if (confirm("คุณต้องการลบรูปโปรไฟล์นี้ใช่หรือไม่?")) {
+                          if (window.confirm("คุณต้องการลบรูปโปรไฟล์นี้ใช่หรือไม่?")) {
                             setProfilePic("");
                           }
                         }}
