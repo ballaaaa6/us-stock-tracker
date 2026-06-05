@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { BarChart2 } from "lucide-react";
-import { fmtUSD, fmtPct, fmtQty, getDynamicDateFormat } from "../../utils/formatters";
+import { fmtUSD, fmtPct, fmtQty } from "../../utils/formatters";
 import { getCurrencyPriceUSD } from "../../utils/assetHelpers";
 import { smoothPath, stepPath, smoothPoints, interpolateData } from "./chartUtils";
+import TimeframeSelector from "./TimeframeSelector";
+import PortfolioChartGrid from "./PortfolioChartGrid";
+import PortfolioTooltip from "./PortfolioTooltip";
 
 export function PortfolioChart({ history, range, onRangeChange, assets, exchangeRate, prices, hideValues }) {
   const svgRef = useRef(null);
@@ -10,10 +13,10 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
   const [dims, setDims] = useState({ w: 800, h: 350 });
   const [zoomRange, setZoomRange] = useState(null); // { start: number, end: number }
   const [dragStart, setDragStart] = useState(null); // { x, type: "zoom" | "pan" | "diff", startZoom }
-  const [dragEnd, setDragEnd] = useState(null); // { x }
   const [diffStartIdx, setDiffStartIdx] = useState(null);
   const [diffEndIdx, setDiffEndIdx] = useState(null);
   const [isDiffActive, setIsDiffActive] = useState(false);
+
   const touchRef = useRef({
     lastX: 0,
     lastY: 0,
@@ -81,8 +84,6 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
   const iW = W - PAD_L - PAD_R;
   const iH = H - PAD_T - PAD_B;
 
-  const RANGES = ["1D", "1W", "1M", "3M", "6M", "YTD", "1Y", "5Y", "MAX"];
-
   const rawDisplayedData = useMemo(() => {
     if (!history) return [];
     if (!zoomRange) return history;
@@ -100,7 +101,6 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
     const interpolated = interpolateData(rawDisplayedData, visibleDurationMs);
     if (!interpolated || interpolated.length < 2) return interpolated;
 
-    // Pre-map each lot of each asset to its closest index in interpolated for exact marker alignment
     const assetLotsWithMappedIdx = assets.map((asset) => {
       const isThai = asset.symbol.toUpperCase().endsWith(".BK");
       const isCashAsset = asset.type === "fiat" || asset.category === "fiat";
@@ -121,11 +121,8 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
       const mappedLots = rawLots
         .map((lot) => {
           if (!lot || !lot.date) return null;
-
-          // Construct full ISO/timestamp for the lot
           const lotTime = new Date(lot.date + "T" + (lot.time || "00:00") + ":00.000Z").getTime();
 
-          // Find closest index in interpolated
           let bestIdx = 0;
           let bestDiff = Infinity;
           interpolated.forEach((d, idx) => {
@@ -152,14 +149,13 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
       };
     });
 
-    // Recalculate cost for each point in interpolated
     return interpolated.map((d, idx) => {
       let totalCostUSD = 0;
       let hasPurchasedAny = false;
 
       assetLotsWithMappedIdx.forEach((asset) => {
         const lotsBeforeOrOn = asset.lots.filter((lot) => lot.mappedIdx <= idx);
-        if (lotsBeforeOrOn.length === 0) return; // not purchased yet
+        if (lotsBeforeOrOn.length === 0) return;
 
         hasPurchasedAny = true;
 
@@ -192,7 +188,6 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
     return firstYear !== lastYear;
   }, [rawDisplayedData]);
 
-  // Group transaction lots by history index
   const transactionsByIdx = useMemo(() => {
     if (!assets || !history || history.length < 2) return {};
     const map = {};
@@ -204,14 +199,11 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
         if (!lot || !lot.date) return;
         const lotDateStr = lot.date;
 
-        // Strict boundary check: transaction must be within history bounds
         if (lotDateStr < startStr || lotDateStr > endStr) return;
 
-        // Find closest date in history
         let bestIdx = -1,
           bestDiff = Infinity;
 
-        // Exact string match on date first
         bestIdx = history.findIndex((h) => h.date.split("T")[0] === lotDateStr);
 
         if (bestIdx === -1) {
@@ -224,8 +216,6 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
               bestIdx = i;
             }
           });
-        } else {
-          bestDiff = 0;
         }
 
         if (bestIdx >= 0) {
@@ -244,26 +234,22 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
     return map;
   }, [assets, history]);
 
-  // Unique lot purchase dates for markers
   const lotMarkers = useMemo(() => {
     if (!displayedData || displayedData.length < 2 || !assets || !history || history.length < 2) return [];
 
     const displayStart = new Date(displayedData[0].date).getTime();
     const displayEnd = new Date(displayedData[displayedData.length - 1].date).getTime();
 
-    // 1. Map each lot to its closest displayed data index if within viewport
     const rawMarkers = [];
     assets.forEach((asset) => {
       (asset.lots || []).forEach((lot) => {
         if (!lot || !lot.date) return;
         const lotTime = new Date(lot.date + "T" + (lot.time || "00:00") + ":00.000Z").getTime();
 
-        // STRICT VIEWPORT BOUNDARY FILTER:
         if (lotTime < displayStart || lotTime > displayEnd) return;
 
         let bestDisplayIdx = -1,
           bestDiff = Infinity;
-        // Find nearest displayed point for coordinate mapping
         displayedData.forEach((d, idx) => {
           const diff = Math.abs(new Date(d.date).getTime() - lotTime);
           if (diff < bestDiff) {
@@ -286,10 +272,8 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
       });
     });
 
-    // 2. Sort markers by screen coordinate X to group them correctly
     rawMarkers.sort((a, b) => a.x - b.x);
 
-    // 3. Group markers dynamically based on screen proximity (< 18 pixels)
     const grouped = [];
     rawMarkers.forEach((m) => {
       if (grouped.length === 0) {
@@ -321,11 +305,8 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
       }
     });
 
-    // 4. Map groups to final markers
     return grouped.map((group) => {
       const x = group.xSum / group.count;
-
-      // Determine color type: all buy = green, all sell = red, mix = orange
       let colorType = "mixed";
       if (group.buysCount > 0 && group.sellsCount === 0) colorType = "buy";
       else if (group.buysCount === 0 && group.sellsCount > 0) colorType = "sell";
@@ -367,7 +348,6 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
     const dataMax = isShortTF ? Math.max(...vals) : Math.max(...vals, ...costs);
     const rangeVal = dataMax - dataMin || dataMin * 0.02 || 1;
 
-    // Adaptive padding (shows movement clearly)
     const pad = rangeVal * 0.05;
     const yMin = Math.max(0, dataMin - pad);
     const yMax = dataMax + pad;
@@ -385,24 +365,27 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
     const color = isUp ? "var(--gain)" : "var(--loss)";
 
     return { pts, costPts, yMin, yMax, isUp, color, renderPts };
-  }, [displayedData, iH, iW, range]);
+  }, [displayedData, iH, iW, range, PAD_T, PAD_L, PAD_B]);
 
-  const findClosestPtByTimestamp = (ts) => {
-    if (!pts || pts.length === 0 || ts == null) return null;
-    let bestPt = pts[0];
-    let bestDiff = Infinity;
-    for (let i = 0; i < pts.length; i++) {
-      const pt = pts[i];
-      if (!pt) continue;
-      const ptTime = new Date(pt.date).getTime();
-      const diff = Math.abs(ptTime - ts);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        bestPt = pt;
+  const findClosestPtByTimestamp = useCallback(
+    (ts) => {
+      if (!pts || pts.length === 0 || ts == null) return null;
+      let bestPt = pts[0];
+      let bestDiff = Infinity;
+      for (let i = 0; i < pts.length; i++) {
+        const pt = pts[i];
+        if (!pt) continue;
+        const ptTime = new Date(pt.date).getTime();
+        const diff = Math.abs(ptTime - ts);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestPt = pt;
+        }
       }
-    }
-    return bestPt;
-  };
+      return bestPt;
+    },
+    [pts]
+  );
 
   const linePath = useMemo(() => smoothPath(renderPts), [renderPts]);
   const costLinePath = useMemo(() => stepPath(costPts), [costPts]);
@@ -558,7 +541,7 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
         });
       }
     },
-    [renderPts, pts, costPts, displayedData, iW, W, dragStart, zoomRange, history, isDiffActive]
+    [renderPts, pts, costPts, displayedData, iW, W, dragStart, zoomRange, history, isDiffActive, PAD_L, PAD_R]
   );
 
   const handleMouseUp = () => {
@@ -570,13 +553,11 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
       }
     }
     setDragStart(null);
-    setDragEnd(null);
   };
 
   const handleMouseLeave = () => {
     setHovered(null);
     setDragStart(null);
-    setDragEnd(null);
   };
 
   // Combined programmatic event listeners to control passive behavior and enable vertical scrolling
@@ -798,13 +779,9 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
             updateDiffStartIdx(null);
             updateDiffEndIdx(null);
           }
-        } else if (ref.type === null) {
-          setIsDiffActive(false);
-          updateDiffStartIdx(null);
-          updateDiffEndIdx(null);
         }
       }
-      touchRef.current = { lastX: 0, startDist: 0, startZoom: null, isPinching: false, centerX: 0 };
+      touchRef.current = null;
     };
 
     const handleTouchStartWithDoubleTap = (e) => {
@@ -840,17 +817,7 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
           <span className="card-section-title" style={{ marginBottom: 0 }}>
             📈 มูลค่าพอร์ต
           </span>
-          <div className="chart-range-tabs">
-            {RANGES.map((r) => (
-              <button
-                key={r}
-                className={`chart-range-tab${range === r ? " active" : ""}`}
-                onClick={() => onRangeChange(r)}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+          <TimeframeSelector range={range} onRangeChange={onRangeChange} />
         </div>
         <div className="chart-empty">
           <BarChart2 size={36} strokeWidth={1.5} />
@@ -931,17 +898,7 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
             )}
           </div>
         </div>
-        <div className="chart-range-tabs">
-          {RANGES.map((r) => (
-            <button
-              key={r}
-              className={`chart-range-tab${range === r ? " active" : ""}`}
-              onClick={() => onRangeChange(r)}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
+        <TimeframeSelector range={range} onRangeChange={onRangeChange} />
       </div>
 
       <div
@@ -994,21 +951,18 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
             </clipPath>
           </defs>
 
-          {yTicks.map(({ y }, i) => (
-            <line
-              key={i}
-              x1={PAD_L}
-              y1={y}
-              x2={W - PAD_R}
-              y2={y}
-              stroke="#F1F5F9"
-              strokeWidth="1"
-              strokeDasharray="4 4"
-            />
-          ))}
-          {dateLabels.map(({ x }, i) => (
-            <line key={i} x1={x} y1={PAD_T} x2={x} y2={H - PAD_B} stroke="#F8FAFC" strokeWidth="1" />
-          ))}
+          <PortfolioChartGrid
+            yTicks={yTicks}
+            dateLabels={dateLabels}
+            PAD_L={PAD_L}
+            PAD_R={PAD_R}
+            PAD_T={PAD_T}
+            PAD_B={PAD_B}
+            W={W}
+            H={H}
+            visibleDurationMs={visibleDurationMs}
+            hasMultipleYears={hasMultipleYears}
+          />
 
           {isDiffActive &&
             diffStartIdx !== null &&
@@ -1064,18 +1018,14 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
               return null;
             })()}
 
-          {costLinePath && fillValueArea && fillCostArea ? (
-            <>
+          {costPts.length > 0 && fillValueArea && fillCostArea ? (
+            <g clipPath="url(#portClipFull)">
               <path d={fillValueArea} fill="url(#portGainGrad)" clipPath="url(#portClipAboveCost)" />
               <path d={fillCostArea} fill="url(#portLossGrad)" clipPath="url(#portClipAboveValue)" />
-            </>
+            </g>
           ) : (
             fillValueArea && (
-              <path
-                d={fillValueArea}
-                fill={isUp ? "url(#portGainGrad)" : "url(#portLossGrad)"}
-                clipPath="url(#portClipFull)"
-              />
+              <path d={fillValueArea} fill={`url(#port${isUp ? "Gain" : "Loss"}Grad)`} clipPath="url(#portClipFull)" />
             )
           )}
 
@@ -1084,60 +1034,27 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
               d={costLinePath}
               fill="none"
               stroke="#5236FF"
-              strokeWidth="2.5"
+              strokeWidth="2.2"
               strokeDasharray="6 4"
-              opacity="0.9"
+              opacity="0.85"
               clipPath="url(#portClipFull)"
             />
           )}
 
-          {linePath && costLinePath ? (
-            <>
-              <path
-                d={linePath}
-                fill="none"
-                stroke="#00B98A"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                clipPath="url(#portClipAboveCost)"
-              />
-              <path
-                d={linePath}
-                fill="none"
-                stroke="#FF4B55"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                clipPath="url(#portClipBelowCost)"
-              />
-            </>
-          ) : (
-            linePath && (
-              <path
-                d={linePath}
-                fill="none"
-                stroke={color}
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                clipPath="url(#portClipFull)"
-              />
-            )
-          )}
-
-          {pts.length > 0 && <circle cx={pts[0].x} cy={pts[0].y} r="4" fill={color} opacity="0.6" />}
-
-          {pts.length > 1 && (
-            <circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r="5" fill={color}>
-              <animate attributeName="r" values="5;7;5" dur="2s" repeatCount="indefinite" />
-            </circle>
+          {linePath && (
+            <path
+              d={linePath}
+              fill="none"
+              stroke={color}
+              strokeWidth="3.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              clipPath="url(#portClipFull)"
+            />
           )}
 
           {lotMarkers.map((m, i) => {
             const markerColor = m.colorType === "buy" ? "#16A34A" : m.colorType === "sell" ? "#DC2626" : "#F59E0B";
-            const isMultiple = m.txs.length > 1;
-            const badgeW = isMultiple ? Math.max(16, m.label.length * 6 + 10) : 15;
             return (
               <g key={i}>
                 <line
@@ -1148,31 +1065,18 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
                   stroke={markerColor}
                   strokeWidth="1.5"
                   strokeDasharray="5 4"
-                  opacity="0.8"
+                  opacity="0.85"
                 />
-                {isMultiple ? (
-                  <rect
-                    x={m.x - badgeW / 2}
-                    y={PAD_T + 2.5}
-                    width={badgeW}
-                    height={15}
-                    rx="7.5"
-                    fill={markerColor}
-                    style={{ cursor: "pointer" }}
-                  />
-                ) : (
-                  <circle cx={m.x} cy={PAD_T + 10} r="7.5" fill={markerColor} style={{ cursor: "pointer" }} />
-                )}
+                <circle cx={m.x} cy={PAD_T + 12} r="7.5" fill={markerColor} />
                 <text
                   x={m.x}
-                  y={PAD_T + 10}
+                  y={PAD_T + 12}
                   textAnchor="middle"
-                  fontSize="8"
+                  fontSize="9"
                   fill="white"
                   fontWeight="900"
-                  fontFamily="Outfit,sans-serif"
+                  fontFamily="var(--font-family)"
                   dominantBaseline="middle"
-                  style={{ cursor: "pointer", pointerEvents: "none" }}
                 >
                   {m.label}
                 </text>
@@ -1216,36 +1120,6 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
             </>
           )}
 
-          {yTicks.map(({ v, y }, i) => (
-            <text
-              key={i}
-              x={PAD_L - 8}
-              y={y + 4}
-              textAnchor="end"
-              fontSize="12"
-              fill="var(--text-muted)"
-              fontFamily="var(--font-family)"
-              fontWeight="700"
-            >
-              {v >= 1000 ? (v / 1000).toFixed(1) + "k" : v.toFixed(v >= 100 ? 0 : 2)}
-            </text>
-          ))}
-
-          {dateLabels.map(({ x, date }, i) => (
-            <text
-              key={i}
-              x={x}
-              y={H - PAD_B + 18}
-              textAnchor="middle"
-              fontSize="11"
-              fill="var(--text-muted)"
-              fontFamily="var(--font-family)"
-              fontWeight="700"
-            >
-              {getDynamicDateFormat(date, visibleDurationMs, hasMultipleYears)}
-            </text>
-          ))}
-
           {costPts && costPts.length > 0 && (
             <>
               <rect
@@ -1272,222 +1146,20 @@ export function PortfolioChart({ history, range, onRangeChange, assets, exchange
           )}
         </svg>
 
-        {hovered &&
-          (() => {
-            const diff = hovered.value - hovered.cost;
-            const diffPct = hovered.cost > 0 ? (diff / hovered.cost) * 100 : 0;
-            const txs = transactionsByIdx[hovered.originalIdx];
-            return (
-              <div
-                className="chart-tooltip-box"
-                style={{
-                  top: Math.max(10, Math.min(H - 180, hovered.y - 45)) + "px",
-                  left: (hovered.x / W) * 100 + "%",
-                  opacity: 1,
-                  transform: hovered.x < W / 2 ? "translateX(15px)" : "translateX(calc(-100% - 15px))",
-                  zIndex: 100,
-                  pointerEvents: "none"
-                }}
-              >
-                <div style={{ fontSize: 10, opacity: 0.75, marginBottom: 2 }}>
-                  {getDynamicDateFormat(hovered.date, visibleDurationMs, hasMultipleYears, true)}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                    <span style={{ fontSize: 10, color: "var(--text-faint)" }}>มูลค่า:</span>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: "white" }}>{fmt.usd(hovered.value)}</span>
-                  </div>
-                  {hovered.cost > 0 && (
-                    <>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                        <span style={{ fontSize: 10, color: "var(--text-faint)" }}>ต้นทุน:</span>
-                        <span style={{ fontSize: 12, fontWeight: 800, color: "#A5B4FC" }}>{fmt.usd(hovered.cost)}</span>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: 12,
-                          borderTop: "1px solid rgba(255,255,255,0.1)",
-                          paddingTop: 2,
-                          marginTop: 2
-                        }}
-                      >
-                        <span style={{ fontSize: 10, color: "var(--text-faint)" }}>P&L:</span>
-                        <span style={{ fontSize: 11, fontWeight: 900, color: diff >= 0 ? "#6EE7B7" : "#FCA5A5" }}>
-                          {diff >= 0 ? "+" : ""}
-                          {fmt.usd(diff)} ({fmt.pct(diffPct)})
-                        </span>
-                      </div>
-                    </>
-                  )}
-                  {txs && txs.length > 0 && (
-                    <div
-                      style={{
-                        marginTop: 6,
-                        borderTop: "1px dashed rgba(255,255,255,0.2)",
-                        paddingTop: 6,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 3
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 10,
-                          color: "#F59E0B",
-                          fontWeight: 800,
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 4
-                        }}
-                      >
-                        🛒 ธุรกรรมในวันนี้:
-                      </span>
-                      {txs.map((tx, idx) => (
-                        <span key={idx} style={{ fontSize: 10, color: "#FFF", opacity: 0.9 }}>
-                          • {tx.type === "BUY" ? "ซื้อ" : "ขาย"} {tx.symbol} {tx.qty.toLocaleString()} หุ้น @{" "}
-                          {fmt.usd(tx.price)}
-                          {tx.time ? ` · ${tx.time} น.` : ""}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-
-        {isDiffActive &&
-          diffStartIdx !== null &&
-          diffEndIdx !== null &&
-          diffStartIdx !== diffEndIdx &&
-          (() => {
-            const ptA = findClosestPtByTimestamp(diffStartIdx);
-            const ptB = findClosestPtByTimestamp(diffEndIdx);
-
-            if (ptA && ptB) {
-              const findClosestHistoryPoint = (ts) => {
-                if (!history || history.length === 0) return null;
-                let best = history[0],
-                  bestDiff = Infinity;
-                history.forEach((h) => {
-                  const diff = Math.abs(new Date(h.date).getTime() - ts);
-                  if (diff < bestDiff) {
-                    bestDiff = diff;
-                    best = h;
-                  }
-                });
-                return best;
-              };
-              const pA = findClosestHistoryPoint(diffStartIdx);
-              const pB = findClosestHistoryPoint(diffEndIdx);
-              if (!pA || !pB) return null;
-
-              const valA = pA.value;
-              const valB = pB.value;
-              const diffVal = valB - valA;
-              const diffPct = valA > 0 ? (diffVal / valA) * 100 : 0;
-
-              const dateA = new Date(pA.date);
-              const dateB = new Date(pB.date);
-              const diffDays = Math.round(Math.abs(dateB - dateA) / (1000 * 60 * 60 * 24));
-              let timeStr = `${diffDays} วัน`;
-              if (diffDays >= 365) {
-                timeStr = `${(diffDays / 365).toFixed(1)} ปี`;
-              } else if (diffDays >= 30) {
-                timeStr = `${(diffDays / 30.4).toFixed(1)} เดือน`;
-              }
-
-              const xA = ptA.x;
-              const xB = ptB.x;
-              const centerPct = ((xA + xB) / 2 / W) * 100;
-
-              const localFmtDate = (dateStr) => {
-                const d = new Date(dateStr);
-                return d.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
-              };
-
-              return (
-                <div
-                  className="chart-tooltip-box"
-                  style={{
-                    position: "absolute",
-                    top: "10px",
-                    left: centerPct >= 50 ? "52px" : "auto",
-                    right: centerPct < 50 ? "12px" : "auto",
-                    opacity: 1,
-                    transform: "none",
-                    zIndex: 101,
-                    pointerEvents: "none",
-                    width: "220px",
-                    padding: "10px 14px",
-                    background: "rgba(15, 23, 42, 0.95)",
-                    border: "1px solid rgba(255,255,255,0.15)",
-                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
-                    borderRadius: "12px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "4px"
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "#94A3B8",
-                      fontWeight: 800,
-                      borderBottom: "1px solid rgba(255,255,255,0.1)",
-                      paddingBottom: 4,
-                      marginBottom: 2
-                    }}
-                  >
-                    📊 เปรียบเทียบค่าส่วนต่าง
-                  </div>
-                  <div style={{ fontSize: 10, color: "#CBD5E1" }}>
-                    {localFmtDate(pA.date)} ➔ {localFmtDate(pB.date)} ({timeStr})
-                  </div>
-
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 2 }}>
-                    <span style={{ color: "#94A3B8" }}>เริ่ม:</span>
-                    <span style={{ color: "white", fontWeight: 700 }}>{fmt.usd(valA)}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
-                    <span style={{ color: "#94A3B8" }}>สิ้นสุด:</span>
-                    <span style={{ color: "white", fontWeight: 700 }}>{fmt.usd(valB)}</span>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: 11,
-                      borderTop: "1px dashed rgba(255,255,255,0.15)",
-                      paddingTop: 4,
-                      marginTop: 2
-                    }}
-                  >
-                    <span style={{ color: "#94A3B8" }}>ส่วนต่าง:</span>
-                    <span
-                      style={{
-                        fontWeight: 900,
-                        color: diffVal >= 0 ? "#10B981" : "#EF4444"
-                      }}
-                    >
-                      {diffVal >= 0 ? "+" : ""}
-                      {fmt.usd(diffVal)} ({diffVal >= 0 ? "+" : ""}
-                      {diffPct.toFixed(2)}%)
-                    </span>
-                  </div>
-                  <div
-                    style={{ fontSize: 9, color: "#94A3B8", textAlign: "center", marginTop: 4, fontStyle: "italic" }}
-                  >
-                    คลิก 1 ครั้งบนกราฟเพื่อล้างข้อมูลเปรียบเทียบ
-                  </div>
-                </div>
-              );
-            }
-            return null;
-          })()}
+        <PortfolioTooltip
+          hovered={hovered}
+          isDiffActive={isDiffActive}
+          diffStartIdx={diffStartIdx}
+          diffEndIdx={diffEndIdx}
+          history={history}
+          visibleDurationMs={visibleDurationMs}
+          hasMultipleYears={hasMultipleYears}
+          transactionsByIdx={transactionsByIdx}
+          W={W}
+          H={H}
+          hideValues={hideValues}
+          findClosestPtByTimestamp={findClosestPtByTimestamp}
+        />
       </div>
     </div>
   );

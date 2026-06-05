@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { RefreshCw } from "lucide-react";
-import { fmtUSD, fmtTHB, fmtPct, fmtQty, getDynamicDateFormat, fmtDateShort } from "../../utils/formatters";
+import { fmtUSD, fmtTHB, fmtPct } from "../../utils/formatters";
 import { smoothPath, stepPath, smoothPoints, interpolateData } from "./chartUtils";
+import ChartGridAndAxes from "./ChartGridAndAxes";
+import EMASelector from "./EMASelector";
+import ChartTooltip from "./ChartTooltip";
 
 const calculateEMA = (data, period) => {
   if (!data || data.length === 0) return [];
@@ -42,10 +45,10 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
   const [dims, setDims] = useState({ w: 600, h: 280 });
   const [zoomRange, setZoomRange] = useState(null); // { start, end }
   const [dragStart, setDragStart] = useState(null);
-  const [dragEnd, setDragEnd] = useState(null);
   const [diffStartIdx, setDiffStartIdx] = useState(null);
   const [diffEndIdx, setDiffEndIdx] = useState(null);
   const [isDiffActive, setIsDiffActive] = useState(false);
+
   const touchRef = useRef({
     lastX: 0,
     lastY: 0,
@@ -193,7 +196,6 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
     return firstYear !== lastYear;
   }, [rawDisplayedCandles]);
 
-  /* ── Compute Y range: adaptive tight scale with dynamic cost curve ── */
   const {
     pts,
     costPts,
@@ -225,7 +227,6 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
       };
     }
 
-    // Sort lots by date ascending
     const sortedLots =
       lots && lots.length > 0
         ? [...lots].sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -233,7 +234,6 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
 
     const isCashAsset = asset?.type === "fiat" || asset?.category === "fiat";
 
-    // A. Create a full price timeline
     const fullPriceData = candles.map((c) => {
       let priceUSD = 0;
       if (isCashAsset) {
@@ -272,15 +272,12 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
       ema200: ema200Arr[i] ?? null
     }));
 
-    // Slice price data to match current zoom viewport
     const rawPriceData = zoomRange
       ? fullPriceDataWithEmas.slice(zoomRange.start, zoomRange.end + 1)
       : fullPriceDataWithEmas;
 
-    // 2. Interpolate priceData dynamically based on visibleDurationMs
     const interpolatedPriceData = interpolateData(rawPriceData, visibleDurationMs);
 
-    // 3. Pre-map each lot in sortedLots to its closest index in interpolatedPriceData
     const lotsWithMappedIdx = sortedLots
       .map((lot) => {
         if (!lot || !lot.date) return null;
@@ -305,7 +302,6 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
 
     const firstPurchaseMappedIdx = lotsWithMappedIdx[0]?.mappedIdx ?? 0;
 
-    // Helper to calculate holding stats on a specific index
     const getStatsOnIndex = (idx) => {
       const lotsBeforeOrOn = lotsWithMappedIdx.filter((lot) => lot.mappedIdx <= idx);
 
@@ -330,7 +326,6 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
       return { qty: runningQty, cost: runningQty * runningAvgCost, avgCost: runningAvgCost };
     };
 
-    // 4. Generate the final interpolatedData
     const interpolatedData = interpolatedPriceData.map((d, i) => {
       const hasPurchased = i >= firstPurchaseMappedIdx;
 
@@ -692,22 +687,25 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
 
   const displayedCandles = interpolatedData;
 
-  const findClosestPtByTimestamp = (ts) => {
-    if (!pts || pts.length === 0 || ts == null) return null;
-    let bestPt = pts[0];
-    let bestDiff = Infinity;
-    for (let i = 0; i < pts.length; i++) {
-      const pt = pts[i];
-      if (!pt) continue;
-      const ptTime = new Date(pt.date).getTime();
-      const diff = Math.abs(ptTime - ts);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        bestPt = pt;
+  const findClosestPtByTimestamp = useCallback(
+    (ts) => {
+      if (!pts || pts.length === 0 || ts == null) return null;
+      let bestPt = pts[0];
+      let bestDiff = Infinity;
+      for (let i = 0; i < pts.length; i++) {
+        const pt = pts[i];
+        if (!pt) continue;
+        const ptTime = new Date(pt.date).getTime();
+        const diff = Math.abs(ptTime - ts);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestPt = pt;
+        }
       }
-    }
-    return bestPt;
-  };
+      return bestPt;
+    },
+    [pts]
+  );
 
   const stateRef = useRef();
   stateRef.current = {
@@ -802,23 +800,30 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
 
       const relX = (mouseXInSvg - PAD_L) / iW;
       const idx = Math.max(0, Math.min(Math.round(relX * (displayedCandles.length - 1)), displayedCandles.length - 1));
-      const pt = renderPts[idx];
-      if (pt) {
-        const costPt = costPts[idx];
-        const rawPt = pts[idx];
+      if (displayedCandles[idx]) {
+        let originalIdx = 0;
+        let bestDiff = Infinity;
+        candles.forEach((c, i) => {
+          const diff = Math.abs(new Date(c.date) - new Date(displayedCandles[idx].date));
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            originalIdx = i;
+          }
+        });
+
         setHovered({
           idx,
-          x: pt.x,
-          y: pt.y,
-          costY: costPt ? costPt.y : null,
-          value: rawPt?.value || pt.value,
-          cost: costPt ? costPt.cost : null,
-          date: pt.date,
-          hasPurchased: pt.hasPurchased
+          originalIdx,
+          x: renderPts[idx]?.x || pts[idx].x,
+          y: renderPts[idx]?.y || pts[idx].y,
+          costY: costPts[idx]?.y,
+          value: displayedCandles[idx].value,
+          cost: displayedCandles[idx].cost || 0,
+          date: displayedCandles[idx].date
         });
       }
     },
-    [renderPts, pts, costPts, displayedCandles, PAD_L, iW, W, dragStart, zoomRange, candles, isDiffActive]
+    [renderPts, pts, costPts, displayedCandles, iW, W, dragStart, zoomRange, candles, isDiffActive, PAD_L, W, PAD_R]
   );
 
   const handleMouseUp = () => {
@@ -830,16 +835,14 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
       }
     }
     setDragStart(null);
-    setDragEnd(null);
   };
 
   const handleMouseLeave = () => {
     setHovered(null);
     setDragStart(null);
-    setDragEnd(null);
   };
 
-  // Touch handlers
+  // Combined programmatic event listeners to control passive behavior and enable vertical scrolling
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -867,8 +870,8 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
 
       let centerIdx = currentStart;
       let bestDiff = Infinity;
-      candles.forEach((h, i) => {
-        const diff = Math.abs(new Date(h.date) - new Date(displayedCandles[hoveredIdx].date));
+      candles.forEach((c, i) => {
+        const diff = Math.abs(new Date(c.date) - new Date(displayedCandles[hoveredIdx].date));
         if (diff < bestDiff) {
           bestDiff = diff;
           centerIdx = i;
@@ -939,8 +942,8 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
 
           let originalIdx = zoomRange ? zoomRange.start : 0;
           let bestDiff = Infinity;
-          candles.forEach((h, i) => {
-            const diff = Math.abs(new Date(h.date) - new Date(displayedCandles[idx].date));
+          candles.forEach((c, i) => {
+            const diff = Math.abs(new Date(c.date) - new Date(displayedCandles[idx].date));
             if (diff < bestDiff) {
               bestDiff = diff;
               originalIdx = i;
@@ -1009,8 +1012,8 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
 
           let originalIdx = zoomRange ? zoomRange.start : 0;
           let bestDiff = Infinity;
-          candles.forEach((h, i) => {
-            const diff = Math.abs(new Date(h.date) - new Date(displayedCandles[idx].date));
+          candles.forEach((c, i) => {
+            const diff = Math.abs(new Date(c.date) - new Date(displayedCandles[idx].date));
             if (diff < bestDiff) {
               bestDiff = diff;
               originalIdx = i;
@@ -1067,13 +1070,9 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
             updateDiffStartIdx(null);
             updateDiffEndIdx(null);
           }
-        } else if (ref.type === null) {
-          setIsDiffActive(false);
-          updateDiffStartIdx(null);
-          updateDiffEndIdx(null);
         }
       }
-      touchRef.current = { lastX: 0, startDist: 0, startZoom: null, isPinching: false, centerX: 0 };
+      touchRef.current = null;
     };
 
     const handleTouchStartWithDoubleTap = (e) => {
@@ -1146,148 +1145,18 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
       }}
     >
       {/* Floating EMA Toggle Panel */}
-      {!isCashAsset && (
-        <div
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          style={{
-            position: "absolute",
-            top: "8px",
-            right: "24px",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            background: "rgba(255, 255, 255, 0.85)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-            border: "1px solid var(--border)",
-            borderRadius: "10px",
-            padding: "4px 10px",
-            boxShadow: "var(--shadow-xs)",
-            zIndex: 10,
-            pointerEvents: "auto",
-            fontFamily: "Outfit, sans-serif"
-          }}
-        >
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-              cursor: "pointer",
-              fontSize: "11px",
-              fontWeight: "700",
-              color: "var(--text-muted)",
-              userSelect: "none"
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={showEma10}
-              onChange={(e) => setShowEma10(e.target.checked)}
-              style={{ cursor: "pointer", accentColor: "#00d2ff" }}
-            />
-            <span
-              style={{
-                display: "inline-block",
-                width: "8px",
-                height: "8px",
-                borderRadius: "50%",
-                background: "#00d2ff"
-              }}
-            ></span>
-            EMA 10
-          </label>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-              cursor: "pointer",
-              fontSize: "11px",
-              fontWeight: "700",
-              color: "var(--text-muted)",
-              userSelect: "none"
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={showEma20}
-              onChange={(e) => setShowEma20(e.target.checked)}
-              style={{ cursor: "pointer", accentColor: "#FBBF24" }}
-            />
-            <span
-              style={{
-                display: "inline-block",
-                width: "8px",
-                height: "8px",
-                borderRadius: "1px",
-                border: "1px dashed #FBBF24",
-                background: "transparent"
-              }}
-            ></span>
-            EMA 20
-          </label>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-              cursor: "pointer",
-              fontSize: "11px",
-              fontWeight: "700",
-              color: "var(--text-muted)",
-              userSelect: "none"
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={showEma50}
-              onChange={(e) => setShowEma50(e.target.checked)}
-              style={{ cursor: "pointer", accentColor: "#F97316" }}
-            />
-            <span
-              style={{
-                display: "inline-block",
-                width: "8px",
-                height: "8px",
-                borderRadius: "50%",
-                background: "#F97316"
-              }}
-            ></span>
-            EMA 50
-          </label>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-              cursor: "pointer",
-              fontSize: "11px",
-              fontWeight: "700",
-              color: "var(--text-muted)",
-              userSelect: "none"
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={showEma200}
-              onChange={(e) => setShowEma200(e.target.checked)}
-              style={{ cursor: "pointer", accentColor: "#DC2626" }}
-            />
-            <span
-              style={{
-                display: "inline-block",
-                width: "8px",
-                height: "8px",
-                borderRadius: "50%",
-                background: "#DC2626"
-              }}
-            ></span>
-            EMA 200
-          </label>
-        </div>
-      )}
+      <EMASelector
+        isCashAsset={isCashAsset}
+        showEma10={showEma10}
+        setShowEma10={setShowEma10}
+        showEma20={showEma20}
+        setShowEma20={setShowEma20}
+        showEma50={showEma50}
+        setShowEma50={setShowEma50}
+        showEma200={showEma200}
+        setShowEma200={setShowEma200}
+      />
+
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", cursor: "crosshair" }}>
         <defs>
           <linearGradient id="gainGrad" x1="0" y1="0" x2="0" y2="1">
@@ -1329,21 +1198,18 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
           )}
         </defs>
 
-        {yTicks.map(({ y }, i) => (
-          <line
-            key={i}
-            x1={PAD_L}
-            y1={y}
-            x2={W - PAD_R}
-            y2={y}
-            stroke="#E8EBF2"
-            strokeWidth="1"
-            strokeDasharray="4 4"
-          />
-        ))}
-        {xTicks.map(({ x }, i) => (
-          <line key={i} x1={x} y1={PAD_T} x2={x} y2={H - PAD_B} stroke="#F1F5F9" strokeWidth="1" />
-        ))}
+        <ChartGridAndAxes
+          yTicks={yTicks}
+          xTicks={xTicks}
+          PAD_L={PAD_L}
+          PAD_R={PAD_R}
+          PAD_T={PAD_T}
+          PAD_B={PAD_B}
+          W={W}
+          H={H}
+          visibleDurationMs={visibleDurationMs}
+          hasMultipleYears={hasMultipleYears}
+        />
 
         {isDiffActive &&
           diffStartIdx !== null &&
@@ -1611,284 +1477,25 @@ export function AssetChart({ candles, avgCost, lots, tf, isThai, exchangeRate, a
             )}
           </>
         )}
-
-        {yTicks.map(({ v, y }, i) => (
-          <text
-            key={i}
-            x={PAD_L - 6}
-            y={y + 4}
-            textAnchor="end"
-            fontSize="10"
-            fill="#94A3B8"
-            fontFamily="Outfit,sans-serif"
-            fontWeight="600"
-          >
-            {v >= 1000 ? (v / 1000).toFixed(1) + "k" : v < 1 ? v.toFixed(4) : v.toFixed(v >= 100 ? 0 : 2)}
-          </text>
-        ))}
-
-        {xTicks.map(({ x, date }, i) => (
-          <text
-            key={i}
-            x={x}
-            y={H - PAD_B + 16}
-            textAnchor="middle"
-            fontSize="10"
-            fill="#94A3B8"
-            fontFamily="Outfit,sans-serif"
-            fontWeight="600"
-          >
-            {getDynamicDateFormat(date, visibleDurationMs, hasMultipleYears)}
-          </text>
-        ))}
       </svg>
 
-      {hovered &&
-        (() => {
-          const diff = hovered.cost != null ? hovered.value - hovered.cost : 0;
-          const diffPct = hovered.cost != null && hovered.cost > 0 ? (diff / hovered.cost) * 100 : 0;
-          const dateStr = hovered.date.split("T")[0];
-          const txs = transactionsByDate[dateStr];
-          const isThaiAsset = asset?.symbol?.endsWith(".BK");
-          return (
-            <div
-              className="chart-tooltip-box"
-              style={{
-                top: Math.max(10, Math.min(H - 180, hovered.y - 45)) + "px",
-                left: (hovered.x / W) * 100 + "%",
-                opacity: 1,
-                transform: hovered.x < W / 2 ? "translateX(15px)" : "translateX(calc(-100% - 15px))",
-                zIndex: 100,
-                pointerEvents: "none"
-              }}
-            >
-              <div style={{ fontSize: 10, opacity: 0.75, marginBottom: 2 }}>
-                {getDynamicDateFormat(hovered.date, visibleDurationMs, hasMultipleYears, true)}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ fontSize: 10, color: "var(--text-faint)" }}>ราคา:</span>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: "white" }}>
-                    {isThaiAsset ? fmtTHB(hovered.value * exchangeRate, hideValues) : fmtUSD(hovered.value, hideValues)}
-                  </span>
-                </div>
-                {hovered.cost != null && (
-                  <>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                      <span style={{ fontSize: 10, color: "var(--text-faint)" }}>ทุนเฉลี่ย:</span>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: "#A5B4FC" }}>
-                        {isThaiAsset
-                          ? fmtTHB(hovered.cost * exchangeRate, hideValues)
-                          : fmtUSD(hovered.cost, hideValues)}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: 12,
-                        borderTop: "1px solid rgba(255,255,255,0.1)",
-                        paddingTop: 2,
-                        marginTop: 2
-                      }}
-                    >
-                      <span style={{ fontSize: 10, color: "var(--text-faint)" }}>P&L:</span>
-                      <span style={{ fontSize: 11, fontWeight: 900, color: diff >= 0 ? "#6EE7B7" : "#FCA5A5" }}>
-                        {diff >= 0 ? "+" : ""}
-                        {isThaiAsset ? fmtTHB(diff * exchangeRate, hideValues) : fmtUSD(diff, hideValues)} (
-                        {fmtPct(diffPct)})
-                      </span>
-                    </div>
-                  </>
-                )}
-                {txs && txs.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: 6,
-                      borderTop: "1px dashed rgba(255,255,255,0.2)",
-                      paddingTop: 6,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 3
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: "#F59E0B",
-                        fontWeight: 800,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4
-                      }}
-                    >
-                      🛒 ธุรกรรมในวันนี้:
-                    </span>
-                    {txs.map((tx, idx) => (
-                      <span key={idx} style={{ fontSize: 10, color: "#FFF", opacity: 0.9 }}>
-                        • {tx.type === "BUY" ? "ซื้อ" : "ขาย"} {fmtQty(tx.qty, hideValues)}{" "}
-                        {isCashAsset ? asset.symbol : "หุ้น"} @{" "}
-                        {isThai ? fmtTHB(tx.price, hideValues) : fmtUSD(tx.price, hideValues)} (ครั้งที่ {tx.num})
-                        {tx.time ? ` · ${tx.time} น.` : ""}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-
-      {isDiffActive &&
-        diffStartIdx !== null &&
-        diffEndIdx !== null &&
-        diffStartIdx !== diffEndIdx &&
-        (() => {
-          const ptA = findClosestPtByTimestamp(diffStartIdx);
-          const ptB = findClosestPtByTimestamp(diffEndIdx);
-
-          if (ptA && ptB) {
-            const findClosestCandle = (ts) => {
-              if (!candles || candles.length === 0) return null;
-              let best = candles[0],
-                bestDiff = Infinity;
-              candles.forEach((c) => {
-                const diff = Math.abs(new Date(c.date).getTime() - ts);
-                if (diff < bestDiff) {
-                  bestDiff = diff;
-                  best = c;
-                }
-              });
-              return best;
-            };
-            const pA = findClosestCandle(diffStartIdx);
-            const pB = findClosestCandle(diffEndIdx);
-            if (!pA || !pB) return null;
-
-            const isThai = asset?.symbol?.endsWith(".BK");
-            const valA = isThai ? pA.close / exchangeRate : pA.close;
-            const valB = isThai ? pB.close / exchangeRate : pB.close;
-            const diffVal = valB - valA;
-            const diffPct = valA > 0 ? (diffVal / valA) * 100 : 0;
-
-            const dateA = new Date(pA.date);
-            const dateB = new Date(pB.date);
-            const diffDays = Math.round(Math.abs(dateB - dateA) / (1000 * 60 * 60 * 24));
-            let timeStr = `${diffDays} วัน`;
-            if (diffDays >= 365) {
-              timeStr = `${(diffDays / 365).toFixed(1)} ปี`;
-            } else if (diffDays >= 30) {
-              timeStr = `${(diffDays / 30.4).toFixed(1)} เดือน`;
-            }
-
-            const xA = ptA.x;
-            const xB = ptB.x;
-            const centerPct = ((xA + xB) / 2 / W) * 100;
-            const yA = ptA.y;
-            const yB = ptB.y;
-            const topPos = Math.min(yA, yB) - 50;
-
-            return (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "10px",
-                  left: centerPct >= 50 ? "52px" : "auto",
-                  right: centerPct < 50 ? "12px" : "auto",
-                  opacity: 1,
-                  transform: "none",
-                  zIndex: 101,
-                  pointerEvents: "none",
-                  width: "220px",
-                  padding: "10px 14px",
-                  background: "rgba(30, 41, 59, 0.95)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
-                  borderRadius: "12px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "4px",
-                  color: "white",
-                  fontFamily: "Outfit, sans-serif"
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "#94A3B8",
-                    fontWeight: 800,
-                    borderBottom: "1px solid rgba(255,255,255,0.1)",
-                    paddingBottom: 4,
-                    marginBottom: 2
-                  }}
-                >
-                  📊 เปรียบเทียบราคาหุ้น
-                </div>
-                <div style={{ fontSize: 10, color: "#CBD5E1" }}>
-                  {fmtDateShort(pA.date)} ➔ {fmtDateShort(pB.date)} ({timeStr})
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", fontSize: 11, marginTop: 2 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: "#94A3B8" }}>เริ่ม:</span>
-                    <span style={{ color: "white", fontWeight: 700 }}>{fmtUSD(valA, hideValues)}</span>
-                  </div>
-                  <div style={{ textAlign: "right", fontSize: 10, color: "#94A3B8" }}>
-                    ({fmtTHB(valA * getHistoricalRate(pA.date), hideValues)})
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", fontSize: 11 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: "#94A3B8" }}>สิ้นสุด:</span>
-                    <span style={{ color: "white", fontWeight: 700 }}>{fmtUSD(valB, hideValues)}</span>
-                  </div>
-                  <div style={{ textAlign: "right", fontSize: 10, color: "#94A3B8" }}>
-                    ({fmtTHB(valB * getHistoricalRate(pB.date), hideValues)})
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    borderTop: "1px dashed rgba(255,255,255,0.15)",
-                    paddingTop: 4,
-                    marginTop: 2
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
-                    <span style={{ color: "#94A3B8" }}>ส่วนต่าง:</span>
-                    <span
-                      style={{
-                        fontWeight: 900,
-                        color: diffVal >= 0 ? "#10B981" : "#EF4444"
-                      }}
-                    >
-                      {diffVal >= 0 ? "+" : ""}
-                      {fmtUSD(diffVal, hideValues)} ({diffVal >= 0 ? "+" : ""}
-                      {diffPct.toFixed(2)}%)
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      textAlign: "right",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: diffVal >= 0 ? "#10B981" : "#EF4444"
-                    }}
-                  >
-                    ({diffVal >= 0 ? "+" : ""}
-                    {fmtTHB(diffVal * getHistoricalRate(pB.date), hideValues)})
-                  </div>
-                </div>
-                <div style={{ fontSize: 9, color: "#94A3B8", textAlign: "center", marginTop: 4, fontStyle: "italic" }}>
-                  คลิก 1 ครั้งบนกราฟเพื่อล้างข้อมูลเปรียบเทียบ
-                </div>
-              </div>
-            );
-          }
-          return null;
-        })()}
+      <ChartTooltip
+        hovered={hovered}
+        isDiffActive={isDiffActive}
+        diffStartIdx={diffStartIdx}
+        diffEndIdx={diffEndIdx}
+        candles={candles}
+        asset={asset}
+        exchangeRate={exchangeRate}
+        hideValues={hideValues}
+        visibleDurationMs={visibleDurationMs}
+        hasMultipleYears={hasMultipleYears}
+        transactionsByDate={transactionsByDate}
+        W={W}
+        H={H}
+        getHistoricalRate={getHistoricalRate}
+        findClosestPtByTimestamp={findClosestPtByTimestamp}
+      />
     </div>
   );
 }
