@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { getRealizedPnL, getCurrencyTicker, getDisplaySymbol, getHistoricalExchangeRate, getRealizedPnLInTHB as rawGetRealizedPnLInTHB } from "../utils/assetHelpers";
 import { calculatePortfolioHistoryTimeline } from "../utils/portfolioHistoryHelpers";
-import { processTransactions } from "../utils/portfolioTransactionHelpers";
+import { processTransactions, recalculatePortfolioFIFO } from "../utils/portfolioTransactionHelpers";
 import { calculatePortfolioValuation } from "../utils/portfolioValuationHelpers";
 import { usePortfolioPrices } from "./usePortfolioPrices";
 import { autoExpirePortfolioOptions } from "../utils/dimePdfParser";
@@ -47,13 +47,14 @@ export function usePortfolioData({ user, showToast, onSessionExpired, askConfirm
 
   // Sync / Save Portfolio with Offline/Conflict resolution (dirty flag)
   const savePortfolio = async (updatedAssets) => {
-    setAssets(updatedAssets);
-    localStorage.setItem(`local_portfolio_${user.username}`, JSON.stringify(updatedAssets));
+    const recalculated = recalculatePortfolioFIFO(updatedAssets, exchangeRate, historicalRates);
+    setAssets(recalculated);
+    localStorage.setItem(`local_portfolio_${user.username}`, JSON.stringify(recalculated));
     try {
       const res = await fetch("/api/portfolio", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${user.token}` },
-        body: JSON.stringify(updatedAssets),
+        body: JSON.stringify(recalculated),
       });
       if (res.status === 401 && onSessionExpired) {
         onSessionExpired();
@@ -96,9 +97,10 @@ export function usePortfolioData({ user, showToast, onSessionExpired, askConfirm
 
       if (isDirtyLocal && localStorage.getItem(`local_portfolio_${user.username}_dirty`) === "true") {
         // Still dirty (sync failed), use local data to avoid overwriting
-        setAssets(localData);
-        await fetchPrices(localData);
-        if (localData.length > 0) fetchSparklines(localData, chartRange);
+        const recalculated = recalculatePortfolioFIFO(localData, exchangeRate, historicalRates);
+        setAssets(recalculated);
+        await fetchPrices(recalculated);
+        if (recalculated.length > 0) fetchSparklines(recalculated, chartRange);
         setLoading(false);
         return;
       }
@@ -111,17 +113,18 @@ export function usePortfolioData({ user, showToast, onSessionExpired, askConfirm
       if (res.ok) {
         let data = await res.json();
         const { updated, changed } = autoExpirePortfolioOptions(data);
+        const finalData = changed ? updated : data;
+        const recalculated = recalculatePortfolioFIFO(finalData, exchangeRate, historicalRates);
         if (changed) {
-          data = updated;
-          await savePortfolio(data);
+          await savePortfolio(recalculated);
         } else {
-          setAssets(data);
-          localStorage.setItem(`local_portfolio_${user.username}`, JSON.stringify(data));
+          setAssets(recalculated);
+          localStorage.setItem(`local_portfolio_${user.username}`, JSON.stringify(recalculated));
           localStorage.removeItem(`local_portfolio_${user.username}_dirty`);
           setIsDirty(false);
         }
-        await fetchPrices(data);
-        if (data.length > 0) fetchSparklines(data, chartRange);
+        await fetchPrices(recalculated);
+        if (recalculated.length > 0) fetchSparklines(recalculated, chartRange);
       } else {
         throw new Error("HTTP " + res.status);
       }
@@ -130,15 +133,16 @@ export function usePortfolioData({ user, showToast, onSessionExpired, askConfirm
       const localData = JSON.parse(localStorage.getItem(`local_portfolio_${user.username}`) || "[]");
       const { updated, changed } = autoExpirePortfolioOptions(localData);
       const finalLocalData = changed ? updated : localData;
+      const recalculated = recalculatePortfolioFIFO(finalLocalData, exchangeRate, historicalRates);
       if (changed) {
-        localStorage.setItem(`local_portfolio_${user.username}`, JSON.stringify(finalLocalData));
+        localStorage.setItem(`local_portfolio_${user.username}`, JSON.stringify(recalculated));
         localStorage.setItem(`local_portfolio_${user.username}_dirty`, "true");
         setIsDirty(true);
       }
-      setAssets(finalLocalData);
+      setAssets(recalculated);
       setIsDirty(localStorage.getItem(`local_portfolio_${user.username}_dirty`) === "true" || changed);
-      await fetchPrices(finalLocalData);
-      if (finalLocalData.length > 0) fetchSparklines(finalLocalData, chartRange);
+      await fetchPrices(recalculated);
+      if (recalculated.length > 0) fetchSparklines(recalculated, chartRange);
       showToast("ใช้ข้อมูลพอร์ตที่บันทึกในเครื่องชั่วคราว", "info");
     } finally {
       setLoading(false);
@@ -257,13 +261,7 @@ export function usePortfolioData({ user, showToast, onSessionExpired, askConfirm
     if (updatedLots.length === 0) {
       updated = assets.filter(a => a.id !== assetId);
     } else {
-      const totalQty = updatedLots.reduce((sum, l) => sum + l.qty, 0);
-      const buyLots = updatedLots.filter(l => l.qty > 0);
-      const buyQty = buyLots.reduce((sum, l) => sum + l.qty, 0);
-      const buyCost = buyLots.reduce((sum, l) => sum + l.qty * l.price, 0);
-      const avgCost = buyQty > 0 ? buyCost / buyQty : asset.avgCost || 0;
-
-      updated = assets.map(a => a.id === assetId ? { ...a, lots: updatedLots, qty: totalQty, avgCost } : a);
+      updated = assets.map(a => a.id === assetId ? { ...a, lots: updatedLots } : a);
     }
 
     await savePortfolio(updated);
@@ -293,14 +291,7 @@ export function usePortfolioData({ user, showToast, onSessionExpired, askConfirm
     };
 
     const updatedLots = asset.lots.map((l, idx) => idx === lotIdx ? newLot : l);
-
-    const totalQty = updatedLots.reduce((sum, l) => sum + l.qty, 0);
-    const buyLots = updatedLots.filter(l => l.qty > 0);
-    const buyQty = buyLots.reduce((sum, l) => sum + l.qty, 0);
-    const buyCost = buyLots.reduce((sum, l) => sum + l.qty * l.price, 0);
-    const avgCost = buyQty > 0 ? buyCost / buyQty : asset.avgCost || 0;
-
-    const updated = assets.map(a => a.id === assetId ? { ...a, lots: updatedLots, qty: totalQty, avgCost, broker: updatedLotData.broker } : a);
+    const updated = assets.map(a => a.id === assetId ? { ...a, lots: updatedLots, broker: updatedLotData.broker } : a);
 
     await savePortfolio(updated);
     await fetchPrices(updated);

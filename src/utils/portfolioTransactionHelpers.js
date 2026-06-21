@@ -195,3 +195,84 @@ export function isTransactionDuplicate(tx, assets) {
     return sameDate && sameTime && sameQty && samePrice;
   });
 }
+
+export function recalculatePortfolioFIFO(assets, exchangeRate, historicalRates) {
+  const getHistoricalRate = (dateStr) => getHistoricalExchangeRate(dateStr, historicalRates, exchangeRate);
+
+  return assets.map(asset => {
+    const isThai = asset.symbol.endsWith(".BK");
+    const isCashAsset = asset.type === "fiat" || asset.category === "fiat";
+
+    if (isCashAsset) {
+      const sortedLots = [...(asset.lots || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+      let totalQty = 0;
+      let totalCostUSD = 0;
+      let buyQty = 0;
+
+      for (const lot of sortedLots) {
+        totalQty += lot.qty;
+        if (lot.qty > 0) {
+          buyQty += lot.qty;
+          totalCostUSD += lot.qty * lot.price;
+        }
+      }
+
+      const avgCost = buyQty > 0 ? totalCostUSD / buyQty : asset.avgCost || 1.0;
+      return {
+        ...asset,
+        lots: sortedLots,
+        qty: totalQty,
+        avgCost,
+        avgPrice: avgCost
+      };
+    }
+
+    const sortedLots = [...(asset.lots || [])].sort((a, b) => {
+      const d = new Date(a.date + "T" + (a.time || "00:00")) - new Date(b.date + "T" + (b.time || "00:00"));
+      if (d !== 0) return d;
+      
+      const isABuy = a.qty > 0;
+      const isBBuy = b.qty > 0;
+      if (isABuy !== isBBuy) return isABuy ? -1 : 1;
+
+      const orderA = a.orderId || a.order_id || "";
+      const orderB = b.orderId || b.order_id || "";
+      return orderA.localeCompare(orderB);
+    });
+
+    const fifoQueue = [];
+    for (const lot of sortedLots) {
+      const lotQty = lot.qty;
+      let lotPriceUSD = lot.price || 0;
+      const txRate = getHistoricalRate(lot.date);
+      if (isThai && txRate) lotPriceUSD = lotPriceUSD / txRate;
+
+      if (lotQty > 0) {
+        fifoQueue.push({ qty: lotQty, price: lotPriceUSD });
+      } else {
+        let remSell = Math.abs(lotQty);
+        while (remSell > 0 && fifoQueue.length > 0) {
+          const oldest = fifoQueue[0];
+          if (oldest.qty <= remSell) {
+            remSell -= oldest.qty;
+            fifoQueue.shift();
+          } else {
+            oldest.qty -= remSell;
+            remSell = 0;
+          }
+        }
+      }
+    }
+
+    const runningQty = fifoQueue.reduce((sum, l) => sum + l.qty, 0);
+    const runningAvgCostUSD = runningQty > 0 ? fifoQueue.reduce((sum, l) => sum + l.qty * l.price, 0) / runningQty : 0;
+
+    return {
+      ...asset,
+      lots: sortedLots,
+      qty: runningQty,
+      avgCost: runningAvgCostUSD,
+      avgPrice: isThai ? runningAvgCostUSD * getHistoricalRate(sortedLots[sortedLots.length - 1]?.date) : runningAvgCostUSD
+    };
+  });
+}
