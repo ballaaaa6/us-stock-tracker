@@ -27,6 +27,7 @@ export default function PnLDetailsModal({
   onDeleteAsset
 }) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState("default");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -66,14 +67,38 @@ export default function PnLDetailsModal({
 
   const totalGainTHB_Modal = totalRealizedTHB_Modal + totalUnrealizedTHB_Modal;
 
-  const filtered = useMemo(() => {
+  const sortedAndFiltered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return breakdown;
-    return breakdown.filter(b =>
-      b.symbol.toLowerCase().includes(q) ||
-      b.name.toLowerCase().includes(q)
-    );
-  }, [breakdown, searchTerm]);
+    let result = breakdown;
+    if (q) {
+      result = breakdown.filter(b =>
+        b.symbol.toLowerCase().includes(q) ||
+        b.name.toLowerCase().includes(q)
+      );
+    }
+
+    return [...result].sort((a, b) => {
+      if (sortBy === "default") {
+        if (b.realized !== a.realized) {
+          return b.realized - a.realized;
+        }
+        return b.totalPnL - a.totalPnL;
+      }
+      if (sortBy === "total_desc") {
+        return b.totalPnL - a.totalPnL;
+      }
+      if (sortBy === "total_asc") {
+        return a.totalPnL - b.totalPnL;
+      }
+      if (sortBy === "realized_desc") {
+        return b.realized - a.realized;
+      }
+      if (sortBy === "unrealized_desc") {
+        return b.unrealized - a.unrealized;
+      }
+      return 0;
+    });
+  }, [breakdown, searchTerm, sortBy]);
 
   if (!isOpen) return null;
 
@@ -139,16 +164,38 @@ export default function PnLDetailsModal({
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div style={{ marginBottom: 14 }}>
+        {/* Search Bar & Sort Dropdown */}
+        <div style={{ display: "flex", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
           <input
             type="text"
             className="form-input"
             placeholder="🔍 ค้นหาตามสัญลักษณ์หรือชื่อ..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ height: 38, borderRadius: 10, width: "100%", padding: "0 12px", border: "1px solid var(--border)", fontSize: 13 }}
+            style={{ height: 38, borderRadius: 10, flex: 1, minWidth: 200, padding: "0 12px", border: "1px solid var(--border)", fontSize: 13 }}
           />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            style={{
+              height: 38,
+              borderRadius: 10,
+              padding: "0 12px",
+              border: "1px solid var(--border)",
+              background: "white",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--text-main)",
+              cursor: "pointer",
+              minWidth: 220
+            }}
+          >
+            <option value="default">🏆 ผลตอบแทน (รับรู้แล้วก่อน)</option>
+            <option value="total_desc">📈 ผลตอบแทนรวม (มาก ไป น้อย)</option>
+            <option value="total_asc">📉 ผลตอบแทนรวม (น้อย ไป มาก)</option>
+            <option value="realized_desc">💰 กำไรที่รับรู้แล้ว (มาก ไป น้อย)</option>
+            <option value="unrealized_desc">💸 กำไรที่ยังไม่รับรู้ (มาก ไป น้อย)</option>
+          </select>
         </div>
 
         {/* Breakdown Table */}
@@ -167,14 +214,14 @@ export default function PnLDetailsModal({
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {sortedAndFiltered.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ padding: 24, textAlign: "center", color: "var(--text-muted)" }}>
                     ไม่พบรายการสินทรัพย์
                   </td>
                 </tr>
               ) : (
-                filtered.map((item, idx) => {
+                sortedAndFiltered.map((item, idx) => {
                   const isSoldOut = item.qty <= 0.00001;
                   const isCash = item.type === "fiat" || item.category === "fiat";
                   const totalPnLTHB = (item.realizedTHB || 0) + (item.unrealized || 0) * exchangeRate;

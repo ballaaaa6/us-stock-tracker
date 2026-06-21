@@ -118,10 +118,16 @@ export function processTransactions({ formData, assets, exchangeRate, historical
       } else {
         const sellQty = Math.abs(lotQty);
         if (runningQty < sellQty) {
-          valid = false;
-          break;
+          // Allow minor floating point discrepancies (e.g., within 0.0001)
+          if (sellQty - runningQty <= 0.0001) {
+            runningQty = 0;
+          } else {
+            valid = false;
+            break;
+          }
+        } else {
+          runningQty = Math.max(0, runningQty - sellQty);
         }
-        runningQty = Math.max(0, runningQty - sellQty);
       }
     }
 

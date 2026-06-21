@@ -258,7 +258,10 @@ export function AssetTransactionHistory({
                           )}
                           {lot.file && (
                             <div style={{ flexBasis: "100%", marginTop: 4 }}>
-                              <span style={{ fontWeight: 700, color: "var(--text-main)" }}>เอกสารอ้างอิง:</span> <span style={{ color: "var(--text-muted)", fontStyle: "italic", background: "white", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 10 }}>{lot.file}</span>
+                              <span style={{ fontWeight: 700, color: "var(--text-main)" }}>เลขอ้างอิง:</span> <span style={{ color: "var(--text-muted)", fontStyle: "italic", background: "white", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 10 }}>{(() => {
+                                const match = lot.file.match(/(DIMEOS\d+)/i);
+                                return match ? match[1] : lot.file;
+                              })()}</span>
                             </div>
                           )}
                         </div>
