@@ -73,19 +73,29 @@ export function processTransactions({ formData, assets, exchangeRate, historical
       price: newPrice,
       type: transactionType,
       // Preserve Dime report metadata if present
-      ...(tx.orderId   ? { orderId:   tx.orderId }   : {}),
-      ...(tx.fee       ? { fee:       tx.fee }       : {}),
-      ...(tx.vat       ? { vat:       tx.vat }       : {}),
-      ...(tx.discount  ? { discount:  tx.discount }  : {}),
-      ...(tx.netAmount ? { netAmount: tx.netAmount } : {}),
-      ...(tx.ccy       ? { ccy:       tx.ccy }       : {}),
+      orderId: tx.orderId || tx.order_id || "",
+      ...(tx.fee != null ? { fee: tx.fee } : {}),
+      ...(tx.vat != null ? { vat: tx.vat } : {}),
+      ...(tx.discount != null ? { discount: tx.discount } : {}),
+      ...(tx.netAmount != null ? { netAmount: tx.netAmount } : {}),
+      ...(tx.ccy || tx.currency ? { ccy: tx.ccy || tx.currency } : {}),
+      ...(tx.gross_usd != null ? { gross_usd: tx.gross_usd } : {}),
+      ...(tx.fee_usd != null ? { fee_usd: tx.fee_usd } : {}),
+      ...(tx.fee_thb != null ? { fee_thb: tx.fee_thb } : {}),
+      ...(tx.vat_thb != null ? { vat_thb: tx.vat_thb } : {}),
+      ...(tx.discount_thb != null ? { discount_thb: tx.discount_thb } : {}),
+      ...(tx.total_usd != null ? { total_usd: tx.total_usd } : {}),
+      ...(tx.total_thb != null ? { total_thb: tx.total_thb } : {}),
+      ...(tx.total_thb_disc != null ? { total_thb_disc: tx.total_thb_disc } : {}),
+      ...(tx.file ? { file: tx.file } : {}),
     };
 
     const currentLots = existing.lots || [];
 
     // Order ID duplicate guard — skip if this orderId already exists on the asset
-    if (tx.orderId && currentLots.some(l => l.orderId === tx.orderId)) {
-      skippedTxs.push({ tx, reason: `Order ID ${tx.orderId} ซ้ำกัน — ข้ามรายการนี้` });
+    const checkOrderId = tx.orderId || tx.order_id;
+    if (checkOrderId && currentLots.some(l => l.orderId === checkOrderId)) {
+      skippedTxs.push({ tx, reason: `Order ID ${checkOrderId} ซ้ำกัน — ข้ามรายการนี้` });
       continue;
     }
 

@@ -186,29 +186,79 @@ export function AssetTransactionHistory({
                               <span style={{ fontWeight: 700, color: "var(--text-main)" }}>Order ID:</span> <code style={{ background: "white", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 10 }}>{lot.orderId}</code>
                             </div>
                           )}
-                          {lot.fee != null && lot.fee > 0 && (
-                            <div>
-                              <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ค่าธรรมเนียม (Fee):</span> {lot.fee.toFixed(2)} {lot.ccy || "USD"}
-                            </div>
-                          )}
-                          {lot.vat != null && lot.vat > 0 && (
-                            <div>
-                              <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ภาษี (VAT):</span> {lot.vat.toFixed(2)} THB
-                            </div>
-                          )}
-                          {lot.discount != null && lot.discount > 0 && (
-                            <div>
-                              <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ส่วนลด:</span> {lot.discount.toFixed(2)} THB
-                            </div>
-                          )}
-                          {lot.netAmount != null && lot.netAmount > 0 && (
-                            <div>
-                              <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ราคาสุทธิ (Net):</span> {lot.ccy === "USD" ? fmtUSD(lot.netAmount) : fmtTHB(lot.netAmount)}
-                            </div>
+                          {lot.gross_usd != null ? (
+                            <>
+                              <div>
+                                <span style={{ fontWeight: 700, color: "var(--text-main)" }}>มูลค่าธุรกรรม (Gross):</span> {fmtUSD(lot.gross_usd)}
+                              </div>
+                              {lot.fee_usd != null && lot.fee_usd > 0 && (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ค่าธรรมเนียม (USD):</span> {fmtUSD(lot.fee_usd)}
+                                </div>
+                              )}
+                              {lot.fee_thb != null && lot.fee_thb > 0 && (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ค่าธรรมเนียม (THB):</span> {fmtTHB(lot.fee_thb)}
+                                </div>
+                              )}
+                              {lot.vat_thb != null && lot.vat_thb > 0 && (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ภาษี (VAT THB):</span> {fmtTHB(lot.vat_thb)}
+                                </div>
+                              )}
+                              {lot.discount_thb != null && lot.discount_thb > 0 && (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ส่วนลด (THB):</span> {fmtTHB(lot.discount_thb)}
+                                </div>
+                              )}
+                              {lot.total_usd != null && (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ราคาสุทธิ (USD):</span> {fmtUSD(lot.total_usd)}
+                                </div>
+                              )}
+                              {lot.total_thb != null && (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ราคาสุทธิ (THB):</span> {fmtTHB(lot.total_thb)}
+                                </div>
+                              )}
+                              {lot.total_thb_disc != null && Math.abs(lot.total_thb_disc - (lot.total_thb || 0)) > 0.01 && (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ราคาสุทธิหลังส่วนลด (THB):</span> {fmtTHB(lot.total_thb_disc)}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {lot.fee != null && lot.fee > 0 && (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ค่าธรรมเนียม (Fee):</span> {lot.fee.toFixed(2)} {lot.ccy || "USD"}
+                                </div>
+                              )}
+                              {lot.vat != null && lot.vat > 0 && (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ภาษี (VAT):</span> {lot.vat.toFixed(2)} THB
+                                </div>
+                              )}
+                              {lot.discount != null && lot.discount > 0 && (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ส่วนลด:</span> {lot.discount.toFixed(2)} THB
+                                </div>
+                              )}
+                              {lot.netAmount != null && lot.netAmount > 0 && (
+                                <div>
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ราคาสุทธิ (Net):</span> {lot.ccy === "USD" ? fmtUSD(lot.netAmount) : fmtTHB(lot.netAmount)}
+                                </div>
+                              )}
+                            </>
                           )}
                           {lot.isAutoExpired && (
                             <div style={{ color: "var(--loss)", fontWeight: 800 }}>
                               ⚠️ สัญญาหมดอายุสะสม (Expired Worthless)
+                            </div>
+                          )}
+                          {lot.file && (
+                            <div style={{ flexBasis: "100%", marginTop: 4 }}>
+                              <span style={{ fontWeight: 700, color: "var(--text-main)" }}>เอกสารอ้างอิง:</span> <span style={{ color: "var(--text-muted)", fontStyle: "italic", background: "white", padding: "2px 6px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 10 }}>{lot.file}</span>
                             </div>
                           )}
                         </div>
