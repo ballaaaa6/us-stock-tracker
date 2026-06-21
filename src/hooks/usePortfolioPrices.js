@@ -18,6 +18,7 @@ export function usePortfolioPrices({ user, chartRange, showToast }) {
     setRefreshing(true);
     try {
       const portfolioSymbols = portfolioAssets
+        .filter(a => a.qty > 0.00001 || a.type === "fiat" || a.category === "fiat")
         .map(a => (a.type === "fiat" || a.category === "fiat") ? (a.symbol === "USD" ? null : getCurrencyTicker(a.symbol)) : a.symbol)
         .filter(Boolean);
       
@@ -71,7 +72,12 @@ export function usePortfolioPrices({ user, chartRange, showToast }) {
     if (!portfolioAssets.length) return;
     setSparklineLoading(true);
     try {
-      const syms = [...new Set(portfolioAssets.map(a => (a.type === "fiat" || a.category === "fiat") ? (a.symbol === "USD" ? null : getCurrencyTicker(a.symbol)) : a.symbol).filter(Boolean))];
+      const syms = [...new Set(
+        portfolioAssets
+          .filter(a => a.qty > 0.00001 || a.type === "fiat" || a.category === "fiat")
+          .map(a => (a.type === "fiat" || a.category === "fiat") ? (a.symbol === "USD" ? null : getCurrencyTicker(a.symbol)) : a.symbol)
+          .filter(Boolean)
+      )];
       let earliestDate = null;
       portfolioAssets.forEach(asset => {
         (asset.lots || []).forEach(lot => {

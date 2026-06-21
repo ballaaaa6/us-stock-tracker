@@ -46,7 +46,8 @@ export async function fetchLivePrices(symbolsParam, isDividends, noCache, contex
 
           // Fetch Beta from Finnhub with Cache API
           let beta = null;
-          if (symbol !== "THB=X" && !symbol.includes("=") && !symbol.includes("-")) {
+          const isOption = symbol.length > 10 && /\d{6}[CP]\d{8}$/.test(symbol);
+          if (symbol !== "THB=X" && !symbol.includes("=") && !symbol.includes("-") && !isOption) {
             const betaCacheKey = `https://cache.local/beta/${symbol}`;
             try {
               const cachedBeta = await getCache(betaCacheKey);
