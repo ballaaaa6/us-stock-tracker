@@ -3,7 +3,7 @@
  * Logic for processing and validating transactions in the portfolio.
  */
 
-import { getHistoricalExchangeRate } from "./assetHelpers";
+import { getHistoricalExchangeRate } from "./assetHelpers.js";
 
 export function processTransactions({ formData, assets, exchangeRate, historicalRates }) {
   const isBatch = Array.isArray(formData);
