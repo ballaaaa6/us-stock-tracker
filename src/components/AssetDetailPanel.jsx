@@ -99,8 +99,20 @@ export default function AssetDetailPanel({ asset, price, exchangeRate, historica
 
   const processedLots = useMemo(() => {
     if (!lots || !lots.length) return [];
-    const sorted = [...lots].sort((a, b) => new Date(a.date) - new Date(b.date));
-    let runningQty = 0, runningAvgCost = 0;
+    const sorted = [...lots].sort((a, b) => {
+      const d = new Date(a.date + "T" + (a.time || "00:00")) - new Date(b.date + "T" + (b.time || "00:00"));
+      if (d !== 0) return d;
+      
+      const isABuy = a.qty > 0;
+      const isBBuy = b.qty > 0;
+      if (isABuy !== isBBuy) return isABuy ? -1 : 1;
+
+      const orderA = a.orderId || a.order_id || "";
+      const orderB = b.orderId || b.order_id || "";
+      return orderA.localeCompare(orderB);
+    });
+
+    const activeBuys = [];
 
     return sorted.map((lot, idx) => {
       const lotQty = lot.qty;
@@ -109,19 +121,35 @@ export default function AssetDetailPanel({ asset, price, exchangeRate, historica
 
       if (lotQty > 0) {
         type = "BUY";
-        runningAvgCost = runningQty + lotQty > 0 ? ((runningQty * runningAvgCost) + (lotQty * lotPriceUSD)) / (runningQty + lotQty) : 0;
-        runningQty += lotQty;
+        activeBuys.push({ qty: lotQty, price: lotPriceUSD });
+        const runningQty = activeBuys.reduce((sum, b) => sum + b.qty, 0);
+        const runningAvgCost = runningQty > 0 ? activeBuys.reduce((sum, b) => sum + b.qty * b.price, 0) / runningQty : 0;
         pnl = (priceUSD - lotPriceUSD) * lotQty;
         pnlPct = lotPriceUSD > 0 ? (pnl / (lotQty * lotPriceUSD)) * 100 : 0;
-      } else if (lotQty < 0) {
+        return { ...lot, type, lotQty, lotPriceUSD, transactionValueUSD, pnl, pnlPct, runningQty, runningAvgCost };
+      } else {
         type = "SELL";
-        const sellQty = Math.abs(lotQty);
-        pnl = (lotPriceUSD - runningAvgCost) * sellQty;
-        pnlPct = runningAvgCost > 0 ? (pnl / (sellQty * runningAvgCost)) * 100 : 0;
-        runningQty = Math.max(0, runningQty - sellQty);
+        let remSell = Math.abs(lotQty);
+        let costOfSharesSold = 0;
+        while (remSell > 0 && activeBuys.length > 0) {
+          const oldest = activeBuys[0];
+          if (oldest.qty <= remSell) {
+            costOfSharesSold += oldest.qty * oldest.price;
+            remSell -= oldest.qty;
+            activeBuys.shift();
+          } else {
+            costOfSharesSold += remSell * oldest.price;
+            oldest.qty -= remSell;
+            remSell = 0;
+          }
+        }
+        const sellValue = Math.abs(lotQty) * lotPriceUSD;
+        pnl = sellValue - costOfSharesSold;
+        pnlPct = costOfSharesSold > 0 ? (pnl / costOfSharesSold) * 100 : 0;
+        const runningQty = activeBuys.reduce((sum, b) => sum + b.qty, 0);
+        const runningAvgCost = runningQty > 0 ? activeBuys.reduce((sum, b) => sum + b.qty * b.price, 0) / runningQty : 0;
+        return { ...lot, type, lotQty, lotPriceUSD, transactionValueUSD, pnl, pnlPct, runningQty, runningAvgCost };
       }
-
-      return { ...lot, type, lotQty, lotPriceUSD, transactionValueUSD, pnl, pnlPct, runningQty, runningAvgCost };
     });
   }, [lots, priceUSD, exchangeRate, isThai]);
 

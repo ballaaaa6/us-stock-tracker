@@ -9,10 +9,17 @@ export function processTransactions({ formData, assets, exchangeRate, historical
   const isBatch = Array.isArray(formData);
   const transactions = isBatch ? formData : [formData];
   const sortedTx = [...transactions].sort((a, b) => {
+    const dateA = new Date(`${a.date || "1970-01-01"}T${a.time || "00:00"}`);
+    const dateB = new Date(`${b.date || "1970-01-01"}T${b.time || "00:00"}`);
+    if (dateA - dateB !== 0) return dateA - dateB;
+
     const isABuy = a.transactionType === "BUY";
     const isBBuy = b.transactionType === "BUY";
     if (isABuy !== isBBuy) return isABuy ? -1 : 1;
-    return new Date(`${a.date || "1970-01-01"}T${a.time || "00:00"}`) - new Date(`${b.date || "1970-01-01"}T${b.time || "00:00"}`);
+
+    const orderA = a.orderId || a.order_id || "";
+    const orderB = b.orderId || b.order_id || "";
+    return orderA.localeCompare(orderB);
   });
 
   const getTodayLocalDate = () => {
@@ -99,10 +106,20 @@ export function processTransactions({ formData, assets, exchangeRate, historical
       continue;
     }
 
-    const updatedLots = [...currentLots, newLot].sort((a, b) => new Date(a.date + "T" + (a.time || "00:00")) - new Date(b.date + "T" + (b.time || "00:00")));
+    const updatedLots = [...currentLots, newLot].sort((a, b) => {
+      const d = new Date(a.date + "T" + (a.time || "00:00")) - new Date(b.date + "T" + (b.time || "00:00"));
+      if (d !== 0) return d;
+      
+      const isABuy = a.qty > 0;
+      const isBBuy = b.qty > 0;
+      if (isABuy !== isBBuy) return isABuy ? -1 : 1;
 
-    let runningQty = 0;
-    let runningAvgCostUSD = 0;
+      const orderA = a.orderId || a.order_id || "";
+      const orderB = b.orderId || b.order_id || "";
+      return orderA.localeCompare(orderB);
+    });
+
+    const fifoQueue = [];
     let valid = true;
 
     for (const lot of updatedLots) {
@@ -112,24 +129,28 @@ export function processTransactions({ formData, assets, exchangeRate, historical
       if (isThai && txRate) lotPriceUSD = lotPriceUSD / txRate;
 
       if (lotQty > 0) {
-        const newTotalQty = runningQty + lotQty;
-        runningAvgCostUSD = newTotalQty > 0 ? ((runningQty * runningAvgCostUSD) + (lotQty * lotPriceUSD)) / newTotalQty : 0;
-        runningQty = newTotalQty;
+        fifoQueue.push({ qty: lotQty, price: lotPriceUSD });
       } else {
-        const sellQty = Math.abs(lotQty);
-        if (runningQty < sellQty) {
-          // Allow minor floating point discrepancies (e.g., within 0.0001)
-          if (sellQty - runningQty <= 0.0001) {
-            runningQty = 0;
+        let remSell = Math.abs(lotQty);
+        while (remSell > 0 && fifoQueue.length > 0) {
+          const oldest = fifoQueue[0];
+          if (oldest.qty <= remSell) {
+            remSell -= oldest.qty;
+            fifoQueue.shift();
           } else {
-            valid = false;
-            break;
+            oldest.qty -= remSell;
+            remSell = 0;
           }
-        } else {
-          runningQty = Math.max(0, runningQty - sellQty);
+        }
+        if (remSell > 0.0001) {
+          valid = false;
+          break;
         }
       }
     }
+
+    const runningQty = fifoQueue.reduce((sum, l) => sum + l.qty, 0);
+    const runningAvgCostUSD = runningQty > 0 ? fifoQueue.reduce((sum, l) => sum + l.qty * l.price, 0) / runningQty : 0;
 
     if (!valid) {
       skippedTxs.push({ tx, reason: `ไม่สามารถทำรายการได้เนื่องจากจะทำให้จำนวนหุ้นติดลบ` });

@@ -34,14 +34,34 @@ export default function AssetLogo({ symbol, category, style }) {
       return [`https://images.financialmodelingprep.com/symbol/GLD.png`];
     }
 
-    // Stock: try Financial Modeling Prep (with full symbol e.g. PTT.BK), then with split symbol, then logo.dev, then Google favicon
+    // Stock: try local logos first, then Financial Modeling Prep, then logo.dev, then Google favicon
+    const optionMatch = sym.match(/^([A-Z]+)(\d{2})(\d{2})(\d{2})([CP])(\d{8})$/);
+    const baseSym = optionMatch ? optionMatch[1] : sym;
+
+    const localLogos = {
+      IREN: "/logos/iren.png",
+      DRAM: "/logos/dram.png"
+    };
+
+    const logoList = [];
+
+    if (localLogos[baseSym]) {
+      logoList.push(localLogos[baseSym]);
+    }
+
     const fullSym = symbol ? symbol.toUpperCase() : "";
-    return [
-      `https://images.financialmodelingprep.com/symbol/${fullSym}.png`,
-      `https://images.financialmodelingprep.com/symbol/${sym}.png`,
-      `https://img.logo.dev/ticker/${sym}?token=pk_R4dEIaKTRG-i8tSiILBNZA&size=128&format=png`,
-      `https://www.google.com/s2/favicons?sz=128&domain=${sym.toLowerCase()}.com`
-    ];
+    logoList.push(`https://images.financialmodelingprep.com/symbol/${fullSym}.png`);
+    logoList.push(`https://images.financialmodelingprep.com/symbol/${baseSym}.png`);
+    logoList.push(`https://img.logo.dev/ticker/${baseSym}?token=pk_R4dEIaKTRG-i8tSiILBNZA&size=128&format=png`);
+
+    const domainOverrides = {
+      IREN: "irisenergy.co",
+      DRAM: "roundhillinvestments.com"
+    };
+    const domain = domainOverrides[baseSym] || `${baseSym.toLowerCase()}.com`;
+    logoList.push(`https://www.google.com/s2/favicons?sz=128&domain=${domain}`);
+
+    return logoList;
   }, [sym, symbol, category]);
 
   // Reset when symbol changes

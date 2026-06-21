@@ -3,71 +3,27 @@
  */
 
 export const ASSET_NAME_MAP = {
-  "MU": "Micron Technology, Inc.",
-  "AAPL": "Apple Inc.",
-  "TSLA": "Tesla, Inc.",
-  "NVDA": "NVIDIA Corporation",
-  "MSFT": "Microsoft Corporation",
-  "AMZN": "Amazon.com, Inc.",
-  "GOOGL": "Alphabet Inc.",
-  "GOOG": "Alphabet Inc.",
-  "META": "Meta Platforms, Inc.",
-  "NFLX": "Netflix, Inc.",
-  "AMD": "Advanced Micro Devices, Inc.",
-  "INTC": "Intel Corporation",
-  "BABA": "Alibaba Group Holding Limited",
-  "ASML": "ASML Holding N.V.",
-  "TSM": "Taiwan Semiconductor Manufacturing Company, Limited",
-  "DIS": "The Walt Disney Company",
-  "NKE": "NIKE, Inc.",
-  "JPM": "JPMorgan Chase & Co.",
-  "V": "Visa Inc.",
-  "MA": "Mastercard Incorporated",
-  "WMT": "Walmart Inc.",
-  "PG": "The Procter & Gamble Company",
-  "KO": "The Coca-Cola Company",
-  "PEP": "PepsiCo, Inc.",
-  "COST": "Costco Wholesale Corporation",
-  "AVGO": "Broadcom Inc.",
-  "QCOM": "Qualcomm Incorporated",
-  "TXN": "Texas Instruments Incorporated",
-  "ADBE": "Adobe Inc.",
-  "CRM": "Salesforce, Inc.",
-  "ORCL": "Oracle Corporation",
-  "ACN": "Accenture plc",
-  "MCD": "McDonald's Corporation",
-  "SBUX": "Starbucks Corporation",
-  "CAT": "Caterpillar Inc.",
-  "GE": "General Electric Company",
-  "F": "Ford Motor Company",
-  "GM": "General Motors Company",
-  "XOM": "Exxon Mobil Corporation",
-  "CVX": "Chevron Corporation",
-  "GC=F": "Spot Gold (ทองคำตลาดโลก)",
-  "CL=F": "Crude Oil (น้ำมันดิบตลาดโลก)",
-  "OIL": "Crude Oil (น้ำมันดิบตลาดโลก)",
-  "GOLD": "Spot Gold (ทองคำตลาดโลก)",
-  "PTT.BK": "PTT Public Company Limited",
-  "CPALL.BK": "CP ALL Public Company Limited",
-  "AOT.BK": "Airports of Thailand Public Company Limited",
-  "BDMS.BK": "Bangkok Dusit Medical Services Public Company Limited",
-  "KBANK.BK": "Kasikornbank Public Company Limited",
-  "SCB.BK": "SCB X Public Company Limited",
-  "ADVANC.BK": "Advanced Info Service Public Company Limited",
-  "GULF.BK": "Gulf Energy Development Public Company Limited",
-  "PTTEP.BK": "PTT Exploration and Production Public Company Limited",
-  "INTUCH.BK": "Intouch Holdings Public Company Limited",
-  "BDMS": "Bangkok Dusit Medical Services Public Company Limited",
-  "KBANK": "Kasikornbank Public Company Limited",
-  "SCB": "SCB X Public Company Limited",
-  "THB": "Thai Baht (เงินบาทไทย ฿)",
-  "USD": "US Dollar (ดอลลาร์สหรัฐ $)",
-  "EUR": "Euro (ยูโร 🇪🇺)",
-  "GBP": "British Pound (ปอนด์สหราชอาณาจักร 🇬🇧)",
-  "JPY": "Japanese Yen (เยนญี่ปุ่น 🇯🇵)",
-  "SGD": "Singapore Dollar (ดอลลาร์สิงคโปร์ 🇸🇬)",
-  "HKD": "Hong Kong Dollar (ดอลลาร์ฮ่องกง 🇭🇰)",
-  "AUD": "Australian Dollar (ดอลลาร์ออสเตรเลีย 🇦🇺)"
+  "MU": "Micron Technology, Inc.", "AAPL": "Apple Inc.", "TSLA": "Tesla, Inc.", "NVDA": "NVIDIA Corporation",
+  "MSFT": "Microsoft Corporation", "AMZN": "Amazon.com, Inc.", "GOOGL": "Alphabet Inc.", "GOOG": "Alphabet Inc.",
+  "META": "Meta Platforms, Inc.", "NFLX": "Netflix, Inc.", "AMD": "Advanced Micro Devices, Inc.", "INTC": "Intel Corporation",
+  "BABA": "Alibaba Group Holding Limited", "ASML": "ASML Holding N.V.", "TSM": "Taiwan Semiconductor Manufacturing Company, Limited",
+  "DIS": "The Walt Disney Company", "NKE": "NIKE, Inc.", "JPM": "JPMorgan Chase & Co.", "V": "Visa Inc.",
+  "MA": "Mastercard Incorporated", "WMT": "Walmart Inc.", "PG": "The Procter & Gamble Company", "KO": "The Coca-Cola Company",
+  "PEP": "PepsiCo, Inc.", "COST": "Costco Wholesale Corporation", "AVGO": "Broadcom Inc.", "QCOM": "Qualcomm Incorporated",
+  "TXN": "Texas Instruments Incorporated", "ADBE": "Adobe Inc.", "CRM": "Salesforce, Inc.", "ORCL": "Oracle Corporation",
+  "ACN": "Accenture plc", "MCD": "McDonald's Corporation", "SBUX": "Starbucks Corporation", "CAT": "Caterpillar Inc.",
+  "GE": "General Electric Company", "F": "Ford Motor Company", "GM": "General Motors Company", "XOM": "Exxon Mobil Corporation",
+  "CVX": "Chevron Corporation", "GC=F": "Spot Gold (ทองคำตลาดโลก)", "CL=F": "Crude Oil (น้ำมันดิบตลาดโลก)",
+  "OIL": "Crude Oil (น้ำมันดิบตลาดโลก)", "GOLD": "Spot Gold (ทองคำตลาดโลก)", "PTT.BK": "PTT Public Company Limited",
+  "CPALL.BK": "CP ALL Public Company Limited", "AOT.BK": "Airports of Thailand Public Company Limited",
+  "BDMS.BK": "Bangkok Dusit Medical Services Public Company Limited", "KBANK.BK": "Kasikornbank Public Company Limited",
+  "SCB.BK": "SCB X Public Company Limited", "ADVANC.BK": "Advanced Info Service Public Company Limited",
+  "GULF.BK": "Gulf Energy Development Public Company Limited", "PTTEP.BK": "PTT Exploration and Production Public Company Limited",
+  "INTUCH.BK": "Intouch Holdings Public Company Limited", "BDMS": "Bangkok Dusit Medical Services Public Company Limited",
+  "KBANK": "Kasikornbank Public Company Limited", "SCB": "SCB X Public Company Limited",
+  "THB": "Thai Baht (เงินบาทไทย ฿)", "USD": "US Dollar (ดอลลาร์สหรัฐ $)",
+  "EUR": "Euro (ยูโร 🇪🇺)", "GBP": "British Pound (ปอนด์สหราชอาณาจักร 🇬🇧)", "JPY": "Japanese Yen (เยนญี่ปุ่น 🇯🇵)",
+  "SGD": "Singapore Dollar (ดอลลาร์สิงคโปร์ 🇸🇬)", "HKD": "Hong Kong Dollar (ดอลลาร์ฮ่องกง 🇭🇰)", "AUD": "Australian Dollar (ดอลลาร์ออสเตรเลีย 🇦🇺)"
 };
 
 export const getDisplaySymbol = (symbol) => {
@@ -135,10 +91,20 @@ export const getCurrencyPriceUSD = (symbol, prices, exchangeRate) => {
 
 export function getRealizedPnL(lots, isThai, exchangeRate) {
   if (!lots || !lots.length) return 0;
-  const sortedLots = [...lots].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const sortedLots = [...lots].sort((a, b) => {
+    const d = new Date(a.date + "T" + (a.time || "00:00")) - new Date(b.date + "T" + (b.time || "00:00"));
+    if (d !== 0) return d;
+    
+    const isABuy = a.qty > 0;
+    const isBBuy = b.qty > 0;
+    if (isABuy !== isBBuy) return isABuy ? -1 : 1;
+
+    const orderA = a.orderId || a.order_id || "";
+    const orderB = b.orderId || b.order_id || "";
+    return orderA.localeCompare(orderB);
+  });
   let realized = 0;
-  let currentQty = 0;
-  let currentAvgCost = 0;
+  const buyLots = [];
   for (const lot of sortedLots) {
     const lotQty = lot.qty;
     let lotPrice = lot.price || 0;
@@ -146,15 +112,24 @@ export function getRealizedPnL(lots, isThai, exchangeRate) {
       lotPrice = lotPrice / exchangeRate;
     }
     if (lotQty > 0) {
-      const newQty = currentQty + lotQty;
-      const newCost = (currentQty * currentAvgCost) + (lotQty * lotPrice);
-      currentAvgCost = newQty > 0 ? newCost / newQty : 0;
-      currentQty = newQty;
+      buyLots.push({ qty: lotQty, price: lotPrice });
     } else if (lotQty < 0) {
-      const sellQty = Math.abs(lotQty);
-      const gain = (lotPrice - currentAvgCost) * sellQty;
-      realized += gain;
-      currentQty = Math.max(0, currentQty - sellQty);
+      let remSell = Math.abs(lotQty);
+      let costOfSharesSold = 0;
+      while (remSell > 0 && buyLots.length > 0) {
+        const oldest = buyLots[0];
+        if (oldest.qty <= remSell) {
+          costOfSharesSold += oldest.qty * oldest.price;
+          remSell -= oldest.qty;
+          buyLots.shift();
+        } else {
+          costOfSharesSold += remSell * oldest.price;
+          oldest.qty -= remSell;
+          remSell = 0;
+        }
+      }
+      const sellValue = Math.abs(lotQty) * lotPrice;
+      realized += (sellValue - costOfSharesSold);
     }
   }
   return realized;
@@ -242,10 +217,20 @@ export function getHistoricalExchangeRate(dateStr, historicalRates, exchangeRate
 
 export function getRealizedPnLInTHB(lots, isThai, historicalRates, exchangeRate) {
   if (!lots || !lots.length) return 0;
-  const sortedLots = [...lots].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const sortedLots = [...lots].sort((a, b) => {
+    const d = new Date(a.date + "T" + (a.time || "00:00")) - new Date(b.date + "T" + (b.time || "00:00"));
+    if (d !== 0) return d;
+    
+    const isABuy = a.qty > 0;
+    const isBBuy = b.qty > 0;
+    if (isABuy !== isBBuy) return isABuy ? -1 : 1;
+
+    const orderA = a.orderId || a.order_id || "";
+    const orderB = b.orderId || b.order_id || "";
+    return orderA.localeCompare(orderB);
+  });
   let realizedTHB = 0;
-  let currentQty = 0;
-  let currentAvgCostUSD = 0;
+  const buyLots = [];
   for (const lot of sortedLots) {
     const lotQty = lot.qty;
     let lotPriceUSD = lot.price || 0;
@@ -254,16 +239,26 @@ export function getRealizedPnLInTHB(lots, isThai, historicalRates, exchangeRate)
       lotPriceUSD = lotPriceUSD / txRate;
     }
     if (lotQty > 0) {
-      const newQty = currentQty + lotQty;
-      const newCost = (currentQty * currentAvgCostUSD) + (lotQty * lotPriceUSD);
-      currentAvgCostUSD = newQty > 0 ? newCost / newQty : 0;
-      currentQty = newQty;
+      buyLots.push({ qty: lotQty, priceUSD: lotPriceUSD });
     } else if (lotQty < 0) {
-      const sellQty = Math.abs(lotQty);
-      const gainUSD = (lotPriceUSD - currentAvgCostUSD) * sellQty;
+      let remSell = Math.abs(lotQty);
+      let costOfSharesSoldUSD = 0;
+      while (remSell > 0 && buyLots.length > 0) {
+        const oldest = buyLots[0];
+        if (oldest.qty <= remSell) {
+          costOfSharesSoldUSD += oldest.qty * oldest.priceUSD;
+          remSell -= oldest.qty;
+          buyLots.shift();
+        } else {
+          costOfSharesSoldUSD += remSell * oldest.priceUSD;
+          oldest.qty -= remSell;
+          remSell = 0;
+        }
+      }
+      const sellValueUSD = Math.abs(lotQty) * lotPriceUSD;
+      const gainUSD = sellValueUSD - costOfSharesSoldUSD;
       const gainTHB = gainUSD * txRate;
       realizedTHB += gainTHB;
-      currentQty = Math.max(0, currentQty - sellQty);
     }
   }
   return realizedTHB;
