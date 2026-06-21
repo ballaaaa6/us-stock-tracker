@@ -6,20 +6,26 @@
 export const fmtUSD = (n, hideValues = false) => {
   if (hideValues) return "****";
   if (n == null) return "—";
+  const parts = n.toString().split('.');
+  const decimalCount = parts[1] ? parts[1].length : 0;
+  const maxDecimals = Math.max(2, Math.min(6, decimalCount));
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
-    maximumFractionDigits: Math.abs(n) < 1 ? 4 : 2
+    maximumFractionDigits: maxDecimals
   }).format(n);
 };
 
 export const fmtTHB = (n, decimals = 2, hideValues = false) => {
   if (hideValues) return "****";
   if (n == null) return "—";
+  const parts = n.toString().split('.');
+  const decimalCount = parts[1] ? parts[1].length : 0;
+  const maxDecimals = Math.max(decimals, Math.min(6, decimalCount));
   return "฿" + new Intl.NumberFormat("th-TH", {
     minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
+    maximumFractionDigits: maxDecimals
   }).format(n);
 };
 

@@ -75,13 +75,13 @@ export default function BestDetailView({ sortedAssets, bestAsset, totalGainUSD, 
           <div style={{ textAlign: "left" }}>
             <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 600 }}>ต้นทุนเฉลี่ย:</span>
             <div style={{ fontWeight: 800, color: "var(--text-main)", marginTop: 2 }}>
-              {isThai ? `฿${bestFullAsset.avgCost.toFixed(2)}` : `$${bestFullAsset.avgCost.toFixed(2)}`}
+              {isThai ? fmt.thb(bestFullAsset.avgCost) : fmt.usd(bestFullAsset.avgCost)}
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
             <span style={{ color: "var(--text-muted)", fontSize: 12, fontWeight: 600 }}>ราคาปัจจุบัน:</span>
             <div style={{ fontWeight: 800, color: "var(--text-main)", marginTop: 2 }}>
-              {isThai ? `฿${bestFullAsset.price.toFixed(2)}` : `$${bestFullAsset.price.toFixed(2)}`}
+              {isThai ? fmt.thb(bestFullAsset.price) : fmt.usd(bestFullAsset.price)}
             </div>
           </div>
           <div style={{ textAlign: "left", marginTop: 4 }}>
