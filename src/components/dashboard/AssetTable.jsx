@@ -32,8 +32,8 @@ export default function AssetTable({
   setHoveredCategory
 }) {
   const fmt = useMemo(() => ({
-    usd: (n) => fmtUSD(n, false),
-    thb: (n, decimals = 2) => fmtTHB(n, decimals, false),
+    usd: (n, exact = false) => fmtUSD(n, false, exact),
+    thb: (n, decimals = 2, exact = false) => fmtTHB(n, decimals, false, exact),
     pct: fmtPct,
     qty: (n) => fmtQty(n, false),
   }), []);

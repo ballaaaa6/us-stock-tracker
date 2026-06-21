@@ -3,12 +3,15 @@
  * Eliminates global mutable state by accepting hideValues as a parameter.
  */
 
-export const fmtUSD = (n, hideValues = false) => {
+export const fmtUSD = (n, hideValues = false, exactDecimals = false) => {
   if (hideValues) return "****";
   if (n == null) return "—";
-  const parts = n.toString().split('.');
-  const decimalCount = parts[1] ? parts[1].length : 0;
-  const maxDecimals = Math.max(2, Math.min(20, decimalCount));
+  let maxDecimals = 2;
+  if (exactDecimals) {
+    const parts = n.toString().split('.');
+    const decimalCount = parts[1] ? parts[1].length : 0;
+    maxDecimals = Math.max(2, Math.min(20, decimalCount));
+  }
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -17,12 +20,15 @@ export const fmtUSD = (n, hideValues = false) => {
   }).format(n);
 };
 
-export const fmtTHB = (n, decimals = 2, hideValues = false) => {
+export const fmtTHB = (n, decimals = 2, hideValues = false, exactDecimals = false) => {
   if (hideValues) return "****";
   if (n == null) return "—";
-  const parts = n.toString().split('.');
-  const decimalCount = parts[1] ? parts[1].length : 0;
-  const maxDecimals = Math.max(decimals, Math.min(20, decimalCount));
+  let maxDecimals = decimals;
+  if (exactDecimals) {
+    const parts = n.toString().split('.');
+    const decimalCount = parts[1] ? parts[1].length : 0;
+    maxDecimals = Math.max(decimals, Math.min(20, decimalCount));
+  }
   return "฿" + new Intl.NumberFormat("th-TH", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: maxDecimals

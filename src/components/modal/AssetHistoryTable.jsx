@@ -62,7 +62,7 @@ export default function AssetHistoryTable({
                     )}
                   </td>
                   <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 600 }}>{fmtQty(lot.qty)}</td>
-                  <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 600 }}>{fmtUSD(lot.price)}</td>
+                  <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 600 }}>{fmtUSD(lot.price, false, true)}</td>
                   <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 700, color: "var(--primary)" }}>
                     {fmtUSD(lot.qty * lot.price)}
                   </td>
@@ -73,7 +73,7 @@ export default function AssetHistoryTable({
               <tr style={{ borderTop: "1.5px solid var(--border)", background: "var(--primary-light)" }}>
                 <td colSpan={2} style={{ padding: "8px 12px", fontWeight: 700, color: "var(--primary)" }}>รวม</td>
                 <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: "var(--primary)", fontSize: 11 }}>
-                  avg {fmtUSD(editingAsset.avgCost)}
+                  avg {fmtUSD(editingAsset.avgCost, false, true)}
                 </td>
                 <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 800, color: "var(--primary)" }}>
                   {fmtUSD(lots.reduce((s, l) => s + l.qty * l.price, 0))}

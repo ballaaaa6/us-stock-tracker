@@ -121,9 +121,9 @@ export function AssetTransactionHistory({
                     </td>
                     <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 600 }}>
                       <div className={hideValues ? "privacy-blurred" : ""}>
-                        <div>{fmtUSD(lot.lotPriceUSD)}</div>
+                        <div>{fmtUSD(lot.lotPriceUSD, false, true)}</div>
                         <div style={{ fontSize: 10, color: "var(--text-faint)", fontWeight: "normal" }}>
-                          ({fmtTHB(lot.lotPriceUSD * rowRate)})
+                          ({fmtTHB(lot.lotPriceUSD * rowRate, 2, false, true)})
                         </div>
                       </div>
                     </td>
@@ -283,9 +283,9 @@ export function AssetTransactionHistory({
                 <td style={{ padding: "9px 12px", textAlign: "right", fontSize: 11, color: "var(--text-muted)" }}>
                   {isCashAsset ? "—" : (
                     <div className={hideValues ? "privacy-blurred" : ""}>
-                      <div>avg {fmtUSD(avgCostUSD)}</div>
+                      <div>avg {fmtUSD(avgCostUSD, false, true)}</div>
                       <div style={{ fontSize: 10, color: "var(--text-faint)" }}>
-                        ({fmtTHB(avgCostUSD * exchangeRate)})
+                        ({fmtTHB(avgCostUSD * exchangeRate, 2, false, true)})
                       </div>
                     </div>
                   )}

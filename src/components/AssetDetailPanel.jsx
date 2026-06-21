@@ -220,8 +220,8 @@ export default function AssetDetailPanel({ asset, price, exchangeRate, historica
           {!isCashAsset && (
             <div className="asset-detail-kpi">
               <div className="asset-detail-kpi-label">ราคาทุนเฉลี่ย</div>
-              <div className={`asset-detail-kpi-val ${hideValues ? "privacy-blurred" : ""}`}>{fmtUSD(avgCostUSD)}</div>
-              <div className={hideValues ? "privacy-blurred" : ""} style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2 }}>({fmtTHB(avgCostUSD * exchangeRate)})</div>
+              <div className={`asset-detail-kpi-val ${hideValues ? "privacy-blurred" : ""}`}>{fmtUSD(avgCostUSD, false, true)}</div>
+              <div className={hideValues ? "privacy-blurred" : ""} style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2 }}>({fmtTHB(avgCostUSD * exchangeRate, 2, false, true)})</div>
             </div>
           )}
           <div className="asset-detail-kpi">
@@ -258,9 +258,9 @@ export default function AssetDetailPanel({ asset, price, exchangeRate, historica
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", background: "#EEECFF", border: "1px solid #C3C7FA", borderRadius: 8, padding: "4px 8px", fontSize: 11 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                   <div style={{ width: 14, height: 2, background: "#5236FF", borderTop: "2px dashed #5236FF" }} />
-                  <span className={hideValues ? "privacy-blurred" : ""} style={{ fontWeight: 700, color: "#5236FF" }}>ราคาทุนเฉลี่ย {fmtUSD(avgCostUSD)}</span>
+                  <span className={hideValues ? "privacy-blurred" : ""} style={{ fontWeight: 700, color: "#5236FF" }}>ราคาทุนเฉลี่ย {fmtUSD(avgCostUSD, false, true)}</span>
                 </div>
-                <span className={hideValues ? "privacy-blurred" : ""} style={{ fontSize: 10, color: "var(--text-faint)", marginLeft: 19 }}>({fmtTHB(avgCostUSD * exchangeRate)})</span>
+                <span className={hideValues ? "privacy-blurred" : ""} style={{ fontSize: 10, color: "var(--text-faint)", marginLeft: 19 }}>({fmtTHB(avgCostUSD * exchangeRate, 2, false, true)})</span>
               </div>
             )}
           </div>
