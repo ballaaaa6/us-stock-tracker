@@ -93,8 +93,14 @@ export default function PnLDetailsModal({
       if (sortBy === "realized_desc") {
         return b.realized - a.realized;
       }
+      if (sortBy === "realized_asc") {
+        return a.realized - b.realized;
+      }
       if (sortBy === "unrealized_desc") {
         return b.unrealized - a.unrealized;
+      }
+      if (sortBy === "unrealized_asc") {
+        return a.unrealized - b.unrealized;
       }
       return 0;
     });
@@ -157,7 +163,7 @@ export default function PnLDetailsModal({
             <div style={{ fontSize: 15, fontWeight: 800, color: totalGainUSD >= 0 ? "var(--gain)" : "var(--loss)" }}>
               {totalGainUSD >= 0 ? "+" : ""}{fmt.usd(totalGainUSD)}
             </div>
-            <div style={{ fontSize: 11, color: totalGainTHB_Modal >= 0 ? "var(--gain)" : "var(--loss)", fontWeight: 700, display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ fontSize: 11, color: "var(--text-faint)" }}>
               <div>{totalGainTHB_Modal >= 0 ? "+" : ""}{fmt.thb(totalGainTHB_Modal)}</div>
               <div style={{ opacity: 0.8, fontSize: 10 }}>({totalGainUSD >= 0 ? "▲" : "▼"} {fmt.pct(totalGainPct)})</div>
             </div>
@@ -194,7 +200,9 @@ export default function PnLDetailsModal({
             <option value="total_desc">📈 ผลตอบแทนรวม (มาก ไป น้อย)</option>
             <option value="total_asc">📉 ผลตอบแทนรวม (น้อย ไป มาก)</option>
             <option value="realized_desc">💰 กำไรที่รับรู้แล้ว (มาก ไป น้อย)</option>
+            <option value="realized_asc">📉 กำไรที่รับรู้แล้ว (น้อย ไป มาก)</option>
             <option value="unrealized_desc">💸 กำไรที่ยังไม่รับรู้ (มาก ไป น้อย)</option>
+            <option value="unrealized_asc">📉 กำไรที่ยังไม่รับรู้ (น้อย ไป มาก)</option>
           </select>
         </div>
 
