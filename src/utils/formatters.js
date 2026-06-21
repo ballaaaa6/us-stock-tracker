@@ -8,7 +8,7 @@ export const fmtUSD = (n, hideValues = false) => {
   if (n == null) return "—";
   const parts = n.toString().split('.');
   const decimalCount = parts[1] ? parts[1].length : 0;
-  const maxDecimals = Math.max(2, Math.min(6, decimalCount));
+  const maxDecimals = Math.max(2, Math.min(20, decimalCount));
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -22,7 +22,7 @@ export const fmtTHB = (n, decimals = 2, hideValues = false) => {
   if (n == null) return "—";
   const parts = n.toString().split('.');
   const decimalCount = parts[1] ? parts[1].length : 0;
-  const maxDecimals = Math.max(decimals, Math.min(6, decimalCount));
+  const maxDecimals = Math.max(decimals, Math.min(20, decimalCount));
   return "฿" + new Intl.NumberFormat("th-TH", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: maxDecimals
@@ -37,9 +37,11 @@ export const fmtPct = (n) => {
 export const fmtQty = (n, hideValues = false) => {
   if (hideValues) return "****";
   if (n == null) return "—";
+  const parts = n.toString().split('.');
+  const decimalCount = parts[1] ? parts[1].length : 0;
   return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 6
+    maximumFractionDigits: Math.max(0, Math.min(20, decimalCount))
   }).format(n);
 };
 

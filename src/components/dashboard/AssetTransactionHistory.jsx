@@ -231,17 +231,17 @@ export function AssetTransactionHistory({
                             <>
                               {lot.fee != null && lot.fee > 0 && (
                                 <div>
-                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ค่าธรรมเนียม (Fee):</span> {lot.fee.toFixed(2)} {lot.ccy || "USD"}
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ค่าธรรมเนียม (Fee):</span> {lot.ccy === "USD" ? fmtUSD(lot.fee) : fmtTHB(lot.fee)}
                                 </div>
                               )}
                               {lot.vat != null && lot.vat > 0 && (
                                 <div>
-                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ภาษี (VAT):</span> {lot.vat.toFixed(2)} THB
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ภาษี (VAT):</span> {fmtTHB(lot.vat)}
                                 </div>
                               )}
                               {lot.discount != null && lot.discount > 0 && (
                                 <div>
-                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ส่วนลด:</span> {lot.discount.toFixed(2)} THB
+                                  <span style={{ fontWeight: 700, color: "var(--text-main)" }}>ส่วนลด:</span> {fmtTHB(lot.discount)}
                                 </div>
                               )}
                               {lot.netAmount != null && lot.netAmount > 0 && (

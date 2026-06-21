@@ -147,7 +147,7 @@ export function validateParsedReceipt(data, imageIndex) {
 
   // Sanity check: if price looks like a total (> $50,000 and qty > 1), divide
   if (price > 50000 && qty > 1) {
-    price = Math.round((price / qty) * 100) / 100;
+    price = price / qty;
   }
 
   // ── Date validation ──
@@ -185,7 +185,7 @@ export function validateParsedReceipt(data, imageIndex) {
     category,
     transactionType,
     qty,
-    price: Math.round(price * 100) / 100,
+    price,
     date,
     time,
     broker: data.broker || "Dime! (Kiatnakin Phatra / เกียรตินาคินภัทร)"
